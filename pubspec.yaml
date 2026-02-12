@@ -1,0 +1,36 @@
+name: login
+description: "A new Flutter project."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.8
+
+dependencies:
+  flutter:
+    sdk: flutter
+  firebase_core: ^3.8.1
+  firebase_auth: ^5.3.3
+  google_sign_in: ^6.2.2
+  cloud_firestore: ^5.6.12
+  google_generative_ai: ^0.4.7
+  fl_chart: ^0.70.2
+  flutter_dotenv: ^5.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  # 읽을 수 있는 설정
+  assets:
+    # Images
+    - assets/images/background.jpg
+    - assets/images/fish_1.png
+    - assets/images/
+
+    # 제외시킬 파일
+    - .env
