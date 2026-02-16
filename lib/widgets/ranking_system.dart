@@ -18,8 +18,7 @@ class _RankingSystemState extends State<RankingSystem> {
     return Column(
       children: [
         _buildRankingHeader(),
-        // 1. 기존 SizedBox(height: 12)를 4 정도로 줄이거나 제거하세요.
-        const SizedBox(height: 4),
+        const SizedBox(height: 10),
         _buildRankingList(),
       ],
     );
@@ -119,20 +118,18 @@ class _RankingSystemState extends State<RankingSystem> {
           ),
           child: ListView.builder(
             shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            // 2. 중요: ListView의 기본 상하단 패딩을 0으로 설정합니다.
+            physics: const NeverScrollableScrollPhysics(), // 부모 스크롤 사용
             padding: EdgeInsets.zero,
-            itemCount: rankers.length > 10 ? 10 : rankers.length,
+            itemCount: rankers.length,
             itemBuilder: (context, index) {
               final user = rankers[index];
               final int rank = index + 1;
               bool isMe = user['uid'] == widget.myUid;
 
               return Container(
-                // 3. ListTile의 여백을 줄이기 위해 Padding을 직접 조절합니다.
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
-                  vertical: 4,
+                  vertical: 8,
                 ),
                 decoration: BoxDecoration(
                   color: isMe
@@ -141,12 +138,11 @@ class _RankingSystemState extends State<RankingSystem> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
-                  // 4. ListTile 대신 Row를 사용하여 여백을 완전히 통제합니다.
                   children: [
                     _getRankIcon(rank),
                     const SizedBox(width: 12),
                     CircleAvatar(
-                      radius: 12,
+                      radius: 14,
                       backgroundImage: user['profileUrl'] != null
                           ? NetworkImage(user['profileUrl'])
                           : const AssetImage(
@@ -154,7 +150,7 @@ class _RankingSystemState extends State<RankingSystem> {
                                 )
                                 as ImageProvider,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         user['nickname'] ?? "익명",
