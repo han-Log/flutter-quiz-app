@@ -1,3 +1,5 @@
+// lib/services/auth_service.dart
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -10,7 +12,7 @@ class AuthService {
   String getKoreanErrorMessage(String errorCode) {
     switch (errorCode) {
       case 'weak-password':
-        return "비밀번호가 너무 취약합니다.";
+        return "비밀번호가 너무 취약합니다. (최소 6자리 이상)";
       case 'email-already-in-use':
         return "이미 가입된 이메일입니다.";
       case 'invalid-email':
@@ -30,25 +32,35 @@ class AuthService {
     }
   }
 
-  // 2. 이메일 회원가입
+  // 2. 이메일 회원가입 (데이터 저장 보완)
   Future<String?> signUpEmail(
     String email,
     String password,
     String nickname,
   ) async {
+    // 💡 [추가] Firebase 정책상 6자 미만은 무조건 에러가 나므로 미리 체크
+    if (password.length < 6) {
+      return "비밀번호는 최소 6자리 이상이어야 합니다.";
+    }
+
     try {
       UserCredential result = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
+
       if (result.user != null) {
-        // 새 사용자 초기 데이터 생성
+        // 계정 생성 후 즉시 Firestore 데이터 생성
+        // 💡 주의: DatabaseService 내의 initializeUserData가 에러 없이 작동해야 함
         await DatabaseService().initializeUserData(email, nickname);
+        debugPrint("✅ Firestore 유저 데이터 생성 완료");
       }
-      return null; // 성공 시 null 반환
+      return null;
     } on FirebaseAuthException catch (e) {
+      debugPrint("❌ 가입 에러 코드: ${e.code}");
       return getKoreanErrorMessage(e.code);
     } catch (e) {
+      debugPrint("❌ 알 수 없는 에러: $e");
       return "회원가입 중 알 수 없는 오류가 발생했습니다.";
     }
   }
@@ -57,7 +69,7 @@ class AuthService {
   Future<String?> loginWithEmail(String email, String password) async {
     try {
       await _auth.signInWithEmailAndPassword(email: email, password: password);
-      return null; // 성공
+      return null;
     } on FirebaseAuthException catch (e) {
       return getKoreanErrorMessage(e.code);
     } catch (e) {
@@ -68,11 +80,9 @@ class AuthService {
   // 4. 구글 로그인
   Future<String?> signInWithGoogle() async {
     try {
-      // 구글 로그인 팝업 띄우기
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
       if (googleUser == null) return "로그인이 취소되었습니다.";
 
-      // 구글 인증 정보 가져오기
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
@@ -80,18 +90,16 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      // Firebase에 구글 자격 증명으로 로그인
       UserCredential result = await _auth.signInWithCredential(credential);
 
       if (result.user != null) {
-        // [중요] 기존 사용자인지 확인 후 처음인 경우에만 초기화
-        // DatabaseService에 해당 로직이 포함되어 있다면 그대로 사용합니다.
         await DatabaseService().initializeUserData(
           result.user!.email ?? "",
           result.user!.displayName ?? "사용자",
+          profileUrl: googleUser.photoUrl,
         );
       }
-      return null; // 성공
+      return null;
     } on FirebaseAuthException catch (e) {
       return getKoreanErrorMessage(e.code);
     } catch (e) {
@@ -99,7 +107,7 @@ class AuthService {
     }
   }
 
-  // 5. 비밀번호 재설정 메일 발송
+  // 5. 비밀번호 재설정 및 6. 로그아웃 유지...
   Future<String?> sendPasswordResetEmail(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email);
@@ -111,10 +119,8 @@ class AuthService {
     }
   }
 
-  // 6. 로그아웃
   Future<void> signOut() async {
     try {
-      // 구글 로그인 세션과 Firebase 세션 모두 종료
       await GoogleSignIn().signOut();
       await _auth.signOut();
     } catch (e) {
@@ -122,6 +128,5 @@ class AuthService {
     }
   }
 
-  // 현재 로그인된 유저 확인용 (필요 시)
   User? get currentUser => _auth.currentUser;
 }
