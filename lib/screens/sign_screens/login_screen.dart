@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // 💡 필수 추가
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/auth_service.dart';
 import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
@@ -14,8 +14,40 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final AuthService _authService = AuthService(); // 인스턴스 유지
+  final AuthService _authService = AuthService();
   bool _rememberMe = false;
+  bool _isLoading = false; // 💡 로딩 상태 관리를 위한 변수 추가
+
+  // 💡 공통 스낵바 알림 함수
+  void _showSnack(String msg, {bool isError = true}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: isError ? Colors.redAccent : Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  // 💡 로그인 통합 로직
+  Future<void> _handleLogin(Future<String?> loginMethod) async {
+    setState(() => _isLoading = true);
+
+    final String? errorMsg = await loginMethod;
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (errorMsg == null) {
+      // ✅ 성공 시 홈으로 이동
+      if (FirebaseAuth.instance.currentUser != null) {
+        Navigator.pushReplacementNamed(context, '/home');
+      }
+    } else {
+      // ❌ 실패 시 한글 에러 메시지 출력
+      _showSnack(errorMsg);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -107,25 +139,21 @@ class _LoginScreenState extends State<LoginScreen> {
                 height: 56,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF8A72FF), Color(0xFF7B61FF)],
+                  gradient: LinearGradient(
+                    colors: _isLoading
+                        ? [Colors.grey, Colors.grey]
+                        : [const Color(0xFF8A72FF), const Color(0xFF7B61FF)],
                   ),
                 ),
                 child: ElevatedButton(
-                  onPressed: () async {
-                    // 💡 에러 해결: 변수에 담지 않고 함수만 실행
-                    await _authService.loginWithEmail(
-                      _emailController.text.trim(),
-                      _passwordController.text.trim(),
-                    );
-
-                    if (!mounted) return;
-
-                    // 💡 직접 로그인 상태 확인
-                    if (FirebaseAuth.instance.currentUser != null) {
-                      Navigator.pushReplacementNamed(context, '/home');
-                    }
-                  },
+                  onPressed: _isLoading
+                      ? null
+                      : () => _handleLogin(
+                          _authService.loginWithEmail(
+                            _emailController.text.trim(),
+                            _passwordController.text.trim(),
+                          ),
+                        ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
                     shadowColor: Colors.transparent,
@@ -133,14 +161,23 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  child: const Text(
-                    "로그인",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text(
+                          "로그인",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
 
@@ -165,18 +202,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 width: double.infinity,
                 height: 56,
                 child: OutlinedButton.icon(
-                  onPressed: () async {
-                    // 💡 에러 해결: userCredential 변수를 지우고 함수만 실행
-                    await _authService.signInWithGoogle();
-
-                    if (!mounted) return;
-
-                    // 💡 직접 로그인 상태 확인
-                    if (FirebaseAuth.instance.currentUser != null) {
-                      Navigator.pushReplacementNamed(context, '/home');
-                    }
-                  },
-                  icon: const Icon(Icons.g_mobiledata, size: 30),
+                  onPressed: _isLoading
+                      ? null
+                      : () => _handleLogin(_authService.signInWithGoogle()),
+                  icon: const Icon(
+                    Icons.g_mobiledata,
+                    size: 30,
+                    color: Color(0xFF101828),
+                  ),
                   label: const Text(
                     "Google로 로그인",
                     style: TextStyle(

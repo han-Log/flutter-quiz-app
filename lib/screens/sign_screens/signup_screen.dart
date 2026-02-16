@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/auth_service.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -16,29 +15,54 @@ class _SignupScreenState extends State<SignupScreen> {
   final _nicknameController = TextEditingController();
   final AuthService _authService = AuthService();
 
+  // 💡 로딩 상태를 관리하여 중복 클릭을 방지합니다.
+  bool _isLoading = false;
+
   void _onSignup() async {
-    if (_nicknameController.text.trim().isEmpty) {
-      _showSnack("닉네임을 입력해주세요.");
-      return;
-    }
-    if (_pwController.text != _confirmPwController.text) {
-      _showSnack("비밀번호가 일치하지 않습니다.");
-      return;
+    final email = _emailController.text.trim();
+    final password = _pwController.text.trim();
+    final confirmPw = _confirmPwController.text.trim();
+    final nickname = _nicknameController.text.trim();
+
+    // 1. 사전 유효성 검사 (입력값 체크)
+    if (nickname.isEmpty) return _showSnack("닉네임을 입력해주세요.");
+    if (email.isEmpty) return _showSnack("이메일을 입력해주세요.");
+
+    // 💡 Firebase 정책에 따라 비밀번호 6자 미만(aaa 등) 사전 차단
+    if (password.length < 6) {
+      return _showSnack("비밀번호는 최소 6자리 이상이어야 합니다.");
     }
 
+    if (password != confirmPw) {
+      return _showSnack("비밀번호가 일치하지 않습니다.");
+    }
+
+    // 2. 가입 프로세스 시작
+    setState(() => _isLoading = true);
+
     try {
-      await _authService.signUpEmail(
-        _emailController.text.trim(),
-        _pwController.text.trim(),
-        _nicknameController.text.trim(),
+      // 💡 AuthService의 signUpEmail이 String?을 반환하도록 설계되었습니다.
+      final String? errorMsg = await _authService.signUpEmail(
+        email,
+        password,
+        nickname,
       );
 
       if (!mounted) return;
-      Navigator.pop(context);
-      _showSnack("회원가입이 완료되었습니다!", isError: false);
-    } on FirebaseAuthException catch (e) {
+      setState(() => _isLoading = false);
+
+      if (errorMsg == null) {
+        // ✅ 가입 성공
+        _showSnack("회원가입이 완료되었습니다!", isError: false);
+        Navigator.pop(context); // 가입 성공 후 로그인 창으로 이동
+      } else {
+        // ❌ 가입 실패 (중복 이메일 등 한글 에러 메시지 출력)
+        _showSnack(errorMsg);
+      }
+    } catch (e) {
       if (!mounted) return;
-      _showSnack(_authService.getKoreanErrorMessage(e.code));
+      setState(() => _isLoading = false);
+      _showSnack("회원가입 중 예상치 못한 오류가 발생했습니다.");
     }
   }
 
@@ -47,6 +71,7 @@ class _SignupScreenState extends State<SignupScreen> {
       SnackBar(
         content: Text(msg),
         backgroundColor: isError ? Colors.redAccent : Colors.green,
+        behavior: SnackBarBehavior.floating, // 디자인을 위해 플로팅 스타일 적용
       ),
     );
   }
@@ -93,7 +118,6 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               const SizedBox(height: 40),
 
-              // 닉네임 입력창
               _buildLabel("Nickname"),
               _buildTextField(
                 controller: _nicknameController,
@@ -102,7 +126,6 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Email 입력창
               _buildLabel("Email"),
               _buildTextField(
                 controller: _emailController,
@@ -111,7 +134,6 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Password 입력창
               _buildLabel("Password"),
               _buildTextField(
                 controller: _pwController,
@@ -121,7 +143,6 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Password 확인 입력창
               _buildLabel("Confirm Password"),
               _buildTextField(
                 controller: _confirmPwController,
@@ -132,18 +153,20 @@ class _SignupScreenState extends State<SignupScreen> {
 
               const SizedBox(height: 70),
 
-              // 가입하기 버튼 (LoginScreen과 동일한 그라데이션)
+              // 가입하기 버튼
               Container(
                 width: double.infinity,
                 height: 56,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF8A72FF), Color(0xFF7B61FF)],
+                  gradient: LinearGradient(
+                    colors: _isLoading
+                        ? [Colors.grey, Colors.grey] // 로딩 중 버튼 색상 비활성화 느낌
+                        : [const Color(0xFF8A72FF), const Color(0xFF7B61FF)],
                   ),
                 ),
                 child: ElevatedButton(
-                  onPressed: _onSignup,
+                  onPressed: _isLoading ? null : _onSignup, // 로딩 중 클릭 차단
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
                     shadowColor: Colors.transparent,
@@ -151,14 +174,23 @@ class _SignupScreenState extends State<SignupScreen> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  child: const Text(
-                    "가입하기",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text(
+                          "가입하기",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -169,7 +201,6 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  // 로그인 화면과 통일된 라벨 스타일
   Widget _buildLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
@@ -187,7 +218,6 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  // 로그인 화면과 통일된 텍스트 필드 스타일
   Widget _buildTextField({
     required TextEditingController controller,
     required String hint,
