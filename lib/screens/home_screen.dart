@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../widgets/score_radar_chart.dart';
 import '../widgets/ranking_system.dart';
+import '../widgets/profile_detail_sheet.dart'; // 💡 새로 만든 위젯 임포트
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,6 +21,8 @@ class _HomeScreenState extends State<HomeScreen>
   final AuthService _authService = AuthService();
   final DatabaseService _dbService = DatabaseService();
   late AnimationController _floatController;
+
+  // 랭킹 스크롤 제어를 위한 컨트롤러
   final ScrollController _rankingScrollController = ScrollController();
 
   @override
@@ -38,116 +41,13 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
-  // 💡 프로필 상세 정보를 보여주는 바텀 시트 함수
-  void _showProfileDetail(
-    Map<String, dynamic> userData,
-    List<double> chartScores,
-  ) {
-    int exp = userData['score'] ?? 0;
-    int level = LevelService.getLevel(exp);
-    double progress = LevelService.getLevelProgress(exp);
-
-    // 퀴즈 통계 계산
-    int totalSolved = 0;
-    int totalCorrect = 0;
-    (userData['categories'] as Map<String, dynamic>? ?? {}).forEach((
-      key,
-      value,
-    ) {
-      totalSolved += (value['total'] as int? ?? 0);
-      totalCorrect += (value['correct'] as int? ?? 0);
-    });
-    int totalWrong = totalSolved - totalCorrect;
-
+  // 💡 프로필 상세 바텀 시트를 여는 공통 함수
+  void _openProfile(Map<String, dynamic> data) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.85,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              const SizedBox(height: 20),
-              CircleAvatar(
-                radius: 50,
-                backgroundImage: userData['profileUrl'] != null
-                    ? NetworkImage(userData['profileUrl'])
-                    : const AssetImage('assets/images/default_profile.png')
-                          as ImageProvider,
-              ),
-              const SizedBox(height: 15),
-              Text(
-                userData['nickname'] ?? "익명",
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                LevelService.getLevelName(level),
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 25),
-
-              // 📊 요약 스탯 카드
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildStatItem("푼 문제", "$totalSolved"),
-                  _buildStatItem("맞춘 문제", "$totalCorrect", color: Colors.blue),
-                  _buildStatItem("틀린 문제", "$totalWrong", color: Colors.red),
-                ],
-              ),
-              const SizedBox(height: 30),
-
-              // 📈 레벨 진척도
-              _buildSectionTitle("레벨 정보 (Lv.$level)"),
-              const SizedBox(height: 10),
-              _buildProgressBar(progress),
-              const SizedBox(height: 30),
-
-              // 🕸️ 역량 분석 차트
-              _buildSectionTitle("영역별 역량 분석"),
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 250,
-                child: ScoreRadarChart(scores: chartScores),
-              ),
-              const SizedBox(height: 40),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatItem(String label, String value, {Color? color}) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-      ],
+      builder: (context) => ProfileDetailSheet(userData: data),
     );
   }
 
@@ -159,15 +59,22 @@ class _HomeScreenState extends State<HomeScreen>
     return StreamBuilder<DocumentSnapshot>(
       stream: _dbService.userDataStream,
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
+        }
+
+        if (!snapshot.hasData || snapshot.data?.data() == null) {
+          return const Scaffold(body: Center(child: Text("데이터를 불러올 수 없습니다.")));
+        }
 
         var userData = snapshot.data!.data() as Map<String, dynamic>;
         int currentExp = userData['score'] ?? 0;
         int currentLevel = LevelService.getLevel(currentExp);
+        String levelName = LevelService.getLevelName(currentLevel);
 
+        // 차트용 데이터
         final List<String> categoryOrder = [
           '사회',
           '인문',
@@ -214,13 +121,12 @@ class _HomeScreenState extends State<HomeScreen>
                       padding: const EdgeInsets.fromLTRB(24, 25, 24, 30),
                       child: Column(
                         children: [
-                          // 💡 프로필 헤더 (클릭 시 상세 팝업 호출)
+                          // 💡 프로필 클릭 시 상세 정보 열기
                           GestureDetector(
-                            onTap: () =>
-                                _showProfileDetail(userData, chartScores),
+                            onTap: () => _openProfile(userData),
                             child: _buildProfileHeader(
                               userData,
-                              LevelService.getLevelName(currentLevel),
+                              levelName,
                               currentExp,
                             ),
                           ),
@@ -230,9 +136,13 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
 
                           const SizedBox(height: 35),
+
+                          // 랭킹 영역 (스크롤바 포함)
                           _buildScrollableRanking(userData['uid']),
+
                           const SizedBox(height: 25),
                           _buildQuizButton(context, currentExp),
+
                           const SizedBox(height: 40),
                           _buildSectionTitle("나의 역량 차트"),
                           const SizedBox(height: 15),
@@ -240,6 +150,7 @@ class _HomeScreenState extends State<HomeScreen>
                             height: 220,
                             child: ScoreRadarChart(scores: chartScores),
                           ),
+
                           const SizedBox(height: 40),
                           _buildLogoutButton(context),
                         ],
@@ -255,7 +166,8 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // --- 기존 헬퍼 함수들 (HomeScreen 내부) ---
+  // --- UI 구성 요소 ---
+
   Widget _buildScrollableRanking(String? myUid) {
     return Container(
       height: 300,
@@ -338,6 +250,7 @@ class _HomeScreenState extends State<HomeScreen>
       BoxShadow(color: Colors.black12, blurRadius: 15, offset: Offset(0, -5)),
     ],
   );
+
   Widget _buildBackground(double height) => Positioned(
     top: 0,
     left: 0,
@@ -345,6 +258,7 @@ class _HomeScreenState extends State<HomeScreen>
     height: height,
     child: Image.asset('assets/images/background.jpg', fit: BoxFit.fill),
   );
+
   Widget _buildAnimatedFish(int level, double bgHeight) => AnimatedBuilder(
     animation: _floatController,
     builder: (context, child) => Positioned(
@@ -356,6 +270,7 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     ),
   );
+
   Widget _buildTopSearchButton(BuildContext context) => Positioned(
     top: 50,
     right: 20,
@@ -464,6 +379,7 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     ),
   );
+
   Widget _buildLogoutButton(BuildContext context) => TextButton(
     onPressed: () async {
       await _authService.signOut();

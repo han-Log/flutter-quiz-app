@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/database_service.dart';
+import '../widgets/profile_detail_sheet.dart'; // 💡 상세 프로필 위젯 임포트
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -13,6 +14,16 @@ class _SearchScreenState extends State<SearchScreen> {
   final DatabaseService _dbService = DatabaseService();
   List<Map<String, dynamic>> _searchResults = [];
   bool _isSearching = false;
+
+  // 💡 프로필 상세 바텀 시트를 여는 함수
+  void _openProfileDetail(Map<String, dynamic> user) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ProfileDetailSheet(userData: user),
+    );
+  }
 
   // 검색 로직
   void _onSearch() async {
@@ -42,6 +53,7 @@ class _SearchScreenState extends State<SearchScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        centerTitle: true,
         title: const Text(
           "친구 찾기",
           style: TextStyle(
@@ -50,7 +62,11 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF101828)),
+          icon: const Icon(
+            Icons.arrow_back_ios,
+            color: Color(0xFF101828),
+            size: 20,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -70,6 +86,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 onSubmitted: (_) => _onSearch(),
                 decoration: InputDecoration(
                   hintText: "찾고 싶은 친구의 닉네임 입력",
+                  hintStyle: TextStyle(color: Colors.grey.shade400),
                   prefixIcon: const Icon(
                     Icons.search,
                     color: Color(0xFF7B61FF),
@@ -112,7 +129,6 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // 검색 결과가 없을 때 보여줄 UI
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -135,7 +151,6 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // 각 유저 항목 위젯
   Widget _buildUserTile(Map<String, dynamic> user) {
     return StreamBuilder<bool>(
       stream: _dbService.isFollowingStream(user['uid']),
@@ -146,42 +161,49 @@ class _SearchScreenState extends State<SearchScreen> {
           padding: const EdgeInsets.symmetric(vertical: 12.0),
           child: Row(
             children: [
-              // 프로필 이미지
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: const Color(0xFFF2F4F7),
-                backgroundImage: user['profileUrl'] != null
-                    ? NetworkImage(user['profileUrl'])
-                    : const AssetImage('assets/images/default_profile.png')
-                          as ImageProvider,
+              // 💡 프로필 이미지 클릭 시 상세 정보 열기
+              GestureDetector(
+                onTap: () => _openProfileDetail(user),
+                child: CircleAvatar(
+                  radius: 26,
+                  backgroundColor: const Color(0xFFF2F4F7),
+                  backgroundImage: user['profileUrl'] != null
+                      ? NetworkImage(user['profileUrl'])
+                      : const AssetImage('assets/images/default_profile.png')
+                            as ImageProvider,
+                ),
               ),
               const SizedBox(width: 16),
-              // 닉네임 및 점수
+              // 💡 닉네임 영역 클릭 시 상세 정보 열기
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      user['nickname'] ?? "익명",
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: Color(0xFF101828),
+                child: GestureDetector(
+                  onTap: () => _openProfileDetail(user),
+                  behavior: HitTestBehavior.opaque, // 빈 공간 클릭도 감지
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user['nickname'] ?? "익명",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Color(0xFF101828),
+                        ),
                       ),
-                    ),
-                    Text(
-                      "최종 점수: ${user['score']} EXP",
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF667085),
+                      Text(
+                        "최종 점수: ${user['score']} EXP",
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF667085),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               // 팔로우 토글 버튼
               SizedBox(
-                width: 100,
+                width: 90,
                 child: ElevatedButton(
                   onPressed: () =>
                       _dbService.toggleFollow(user['uid'], isFollowing),
