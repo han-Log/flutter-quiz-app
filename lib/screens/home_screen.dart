@@ -6,7 +6,7 @@ import '../services/level_service.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../widgets/score_radar_chart.dart';
-import '../widgets/ranking_system.dart'; // 💡 새로 만든 위젯 임포트
+import '../widgets/ranking_system.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -99,7 +99,7 @@ class _HomeScreenState extends State<HomeScreen>
                 backgroundHeight,
               ),
 
-              // 3. 상단 친구 추가 버튼 (Social 기능)
+              // 3. 상단 친구 추가 버튼
               Positioned(
                 top: 50,
                 right: 20,
@@ -154,9 +154,13 @@ class _HomeScreenState extends State<HomeScreen>
                             LevelService.getLevelProgress(currentExp),
                             LevelService.expUntilNextLevel(currentExp),
                           ),
-                          const SizedBox(height: 35),
 
-                          // 💡 분리된 랭킹 시스템 위젯 호출
+                          // 🚀 퀴즈 버튼 위치 이동 (진척도 바와 랭킹 사이)
+                          const SizedBox(height: 20),
+                          _buildQuizButton(context, currentExp),
+
+                          const SizedBox(height: 20),
+                          // 💡 랭킹 시스템 호출
                           RankingSystem(myUid: userData['uid']),
 
                           const SizedBox(height: 35),
@@ -166,18 +170,16 @@ class _HomeScreenState extends State<HomeScreen>
                             height: 250,
                             child: ScoreRadarChart(scores: chartScores),
                           ),
+
                           const SizedBox(height: 40),
-                          _buildQuizButton(context, currentExp),
-                          const SizedBox(height: 20),
                           TextButton(
                             onPressed: () async {
                               await _authService.signOut();
-                              if (mounted) {
+                              if (mounted)
                                 Navigator.pushReplacementNamed(
                                   context,
                                   '/login',
                                 );
-                              }
                             },
                             child: Text(
                               "로그아웃",
@@ -303,13 +305,6 @@ class _HomeScreenState extends State<HomeScreen>
               color: const Color(0xFF7B61FF),
             ),
           ),
-
-          // 칸이 적어서 숨김
-          // const SizedBox(height: 10),
-          // Text(
-          //   remaining > 0 ? "다음 레벨까지 $remaining EXP" : "최고 레벨 달성!",
-          //   style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-          // ),
         ],
       ),
     );
@@ -328,9 +323,19 @@ class _HomeScreenState extends State<HomeScreen>
   );
 
   Widget _buildQuizButton(BuildContext context, int currentExp) {
-    return SizedBox(
+    return Container(
       width: double.infinity,
-      height: 64,
+      height: 50, // 높이를 살짝 조절하여 상단에 더 잘 어울리게 함
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF7B61FF).withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: ElevatedButton(
         onPressed: () {
           Navigator.push(
@@ -348,9 +353,16 @@ class _HomeScreenState extends State<HomeScreen>
           ),
           elevation: 0,
         ),
-        child: const Text(
-          "퀴즈 시작하기",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.play_circle_fill, color: Colors.white),
+            SizedBox(width: 8),
+            Text(
+              "지금 바로 퀴즈 시작",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
         ),
       ),
     );
