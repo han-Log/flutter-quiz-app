@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'quiz_screen.dart';
+import 'search_screen.dart';
 import '../services/level_service.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../widgets/score_radar_chart.dart';
+import '../widgets/ranking_system.dart'; // 💡 새로 만든 위젯 임포트
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -42,7 +44,6 @@ class _HomeScreenState extends State<HomeScreen>
     return StreamBuilder<DocumentSnapshot>(
       stream: _dbService.userDataStream,
       builder: (context, snapshot) {
-        // [수정] 스냅샷 데이터 확인 로직 보강
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
@@ -80,6 +81,7 @@ class _HomeScreenState extends State<HomeScreen>
           backgroundColor: Colors.white,
           body: Stack(
             children: [
+              // 1. 배경 이미지
               Positioned(
                 top: 0,
                 left: 0,
@@ -91,11 +93,31 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ),
 
+              // 2. 애니메이션 물고기
               _buildAnimatedFish(
                 LevelService.getSafeLevel(currentLevel),
                 backgroundHeight,
               ),
 
+              // 3. 상단 친구 추가 버튼 (Social 기능)
+              Positioned(
+                top: 50,
+                right: 20,
+                child: CircleAvatar(
+                  backgroundColor: Colors.black.withOpacity(0.2),
+                  child: IconButton(
+                    icon: const Icon(Icons.person_add, color: Colors.white),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SearchScreen(),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // 4. 메인 콘텐츠 시트
               Positioned(
                 top: backgroundHeight - 50,
                 left: 0,
@@ -127,15 +149,16 @@ class _HomeScreenState extends State<HomeScreen>
                       child: Column(
                         children: [
                           _buildProfileHeader(userData, levelName, currentExp),
-                          const SizedBox(height: 25),
+                          const SizedBox(height: 12),
                           _buildProgressBar(
                             LevelService.getLevelProgress(currentExp),
                             LevelService.expUntilNextLevel(currentExp),
                           ),
                           const SizedBox(height: 35),
-                          _buildSectionTitle("실시간 랭킹 (Top 10)"),
-                          const SizedBox(height: 12),
-                          _buildRankingList(userData['uid']),
+
+                          // 💡 분리된 랭킹 시스템 위젯 호출
+                          RankingSystem(myUid: userData['uid']),
+
                           const SizedBox(height: 35),
                           _buildSectionTitle("영역별 역량 분석"),
                           const SizedBox(height: 15),
@@ -174,7 +197,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // --- 위젯 빌드 함수 정의 (에러 해결 핵심 부분) ---
+  // --- UI 빌더 함수들 ---
 
   Widget _buildAnimatedFish(int displayLevel, double backgroundHeight) {
     return AnimatedBuilder(
@@ -246,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _buildProgressBar(double progress, int remaining) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(11),
       decoration: BoxDecoration(
         color: const Color(0xFFF8F9FF),
         borderRadius: BorderRadius.circular(24),
@@ -280,114 +303,14 @@ class _HomeScreenState extends State<HomeScreen>
               color: const Color(0xFF7B61FF),
             ),
           ),
-          const SizedBox(height: 10),
-          Text(
-            remaining > 0 ? "다음 레벨까지 $remaining EXP" : "최고 레벨 달성!",
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-          ),
+
+          // 칸이 적어서 숨김
+          // const SizedBox(height: 10),
+          // Text(
+          //   remaining > 0 ? "다음 레벨까지 $remaining EXP" : "최고 레벨 달성!",
+          //   style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+          // ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildRankingList(String? myUid) {
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _dbService.rankingStream,
-      builder: (context, snapshot) {
-        if (!snapshot.hasData)
-          return const SizedBox(
-            height: 100,
-            child: Center(child: CircularProgressIndicator()),
-          );
-
-        final rankers = snapshot.data!;
-        return Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8F9FF),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: rankers.length > 10 ? 10 : rankers.length,
-            itemBuilder: (context, index) {
-              final user = rankers[index];
-              final int rank = index + 1;
-              bool isMe = user['uid'] == myUid;
-
-              return Container(
-                decoration: BoxDecoration(
-                  color: isMe
-                      ? const Color(0xFF7B61FF).withValues(alpha: 0.05)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: ListTile(
-                  dense: true,
-                  leading: _getRankIcon(rank),
-                  title: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 10,
-                        backgroundImage: user['profileUrl'] != null
-                            ? NetworkImage(user['profileUrl'])
-                            : const AssetImage(
-                                    'assets/images/default_profile.png',
-                                  )
-                                  as ImageProvider,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        user['nickname'] ?? "익명",
-                        style: TextStyle(
-                          fontWeight: isMe
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                      if (rank >= 4) ...[
-                        const SizedBox(width: 6),
-                        const Text(
-                          "RANKER",
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: Colors.orange,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  trailing: Text(
-                    "${user['score']} EXP",
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _getRankIcon(int rank) {
-    if (rank == 1)
-      return const Icon(Icons.emoji_events, color: Colors.amber, size: 22);
-    if (rank == 2)
-      return const Icon(Icons.emoji_events, color: Color(0xFFC0C0C0), size: 22);
-    if (rank == 3)
-      return const Icon(Icons.emoji_events, color: Color(0xFFCD7F32), size: 22);
-    return SizedBox(
-      width: 22,
-      child: Center(
-        child: Text(
-          "$rank",
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.grey,
-          ),
-        ),
       ),
     );
   }
