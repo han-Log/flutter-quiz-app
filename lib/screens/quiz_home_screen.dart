@@ -1,28 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart'; // 💡 intl 패키지 추가 확인
 import 'quiz_screen.dart';
 import 'search_screen.dart';
 import '../services/level_service.dart';
-import '../services/auth_service.dart';
 import '../services/database_service.dart';
-import '../widgets/score_radar_chart.dart';
 import '../widgets/ranking_system.dart';
-import '../widgets/profile_detail_sheet.dart'; // 💡 새로 만든 위젯 임포트
+import '../widgets/profile_detail_sheet.dart';
 
 class QuizHomeScreen extends StatefulWidget {
   const QuizHomeScreen({super.key});
 
   @override
-  State<QuizHomeScreen> createState() => _HomeScreenState();
+  State<QuizHomeScreen> createState() => _QuizHomeScreenState();
 }
 
-class _HomeScreenState extends State<QuizHomeScreen>
+class _QuizHomeScreenState extends State<QuizHomeScreen>
     with SingleTickerProviderStateMixin {
-  final AuthService _authService = AuthService();
   final DatabaseService _dbService = DatabaseService();
   late AnimationController _floatController;
-
-  // 랭킹 스크롤 제어를 위한 컨트롤러
   final ScrollController _rankingScrollController = ScrollController();
 
   @override
@@ -41,7 +37,6 @@ class _HomeScreenState extends State<QuizHomeScreen>
     super.dispose();
   }
 
-  // 💡 프로필 상세 바텀 시트를 여는 공통 함수
   void _openProfile(Map<String, dynamic> data) {
     showModalBottomSheet(
       context: context,
@@ -54,44 +49,19 @@ class _HomeScreenState extends State<QuizHomeScreen>
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
-    final double backgroundHeight = screenHeight * 0.35;
+    final double backgroundHeight = screenHeight * 0.32;
 
     return StreamBuilder<DocumentSnapshot>(
       stream: _dbService.userDataStream,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (!snapshot.hasData)
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
-        }
-
-        if (!snapshot.hasData || snapshot.data?.data() == null) {
-          return const Scaffold(body: Center(child: Text("데이터를 불러올 수 없습니다.")));
-        }
 
         var userData = snapshot.data!.data() as Map<String, dynamic>;
         int currentExp = userData['score'] ?? 0;
         int currentLevel = LevelService.getLevel(currentExp);
-        String levelName = LevelService.getLevelName(currentLevel);
-
-        // 차트용 데이터
-        final List<String> categoryOrder = [
-          '사회',
-          '인문',
-          '예술',
-          '역사',
-          '경제',
-          '과학',
-          '일상',
-        ];
-        List<double> chartScores = categoryOrder
-            .map((cat) {
-              var stats = (userData['categories'] ?? {})[cat];
-              if (stats == null || stats['total'] == 0) return 0.0;
-              return (stats['correct'] / stats['total']) * 10.0;
-            })
-            .toList()
-            .cast<double>();
 
         return Scaffold(
           backgroundColor: Colors.white,
@@ -102,59 +72,31 @@ class _HomeScreenState extends State<QuizHomeScreen>
                 LevelService.getSafeLevel(currentLevel),
                 backgroundHeight,
               ),
-              _buildTopSearchButton(context),
-
+              _buildTopSearchButton(),
               Positioned(
-                top: backgroundHeight - 50,
+                top: backgroundHeight - 40,
                 left: 0,
                 right: 0,
                 bottom: 0,
                 child: Container(
                   decoration: _sheetDecoration(),
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(40),
-                      topRight: Radius.circular(40),
-                    ),
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(24, 25, 24, 30),
-                      child: Column(
-                        children: [
-                          // 💡 프로필 클릭 시 상세 정보 열기
-                          GestureDetector(
-                            onTap: () => _openProfile(userData),
-                            child: _buildProfileHeader(
-                              userData,
-                              levelName,
-                              currentExp,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          _buildProgressBar(
-                            LevelService.getLevelProgress(currentExp),
-                          ),
-
-                          const SizedBox(height: 35),
-
-                          // 랭킹 영역 (스크롤바 포함)
-                          _buildScrollableRanking(userData['uid']),
-
-                          const SizedBox(height: 25),
-                          _buildQuizButton(context, currentExp),
-
-                          const SizedBox(height: 40),
-                          _buildSectionTitle("나의 역량 차트"),
-                          const SizedBox(height: 15),
-                          SizedBox(
-                            height: 220,
-                            child: ScoreRadarChart(scores: chartScores),
-                          ),
-
-                          const SizedBox(height: 40),
-                          _buildLogoutButton(context),
-                        ],
-                      ),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+                    child: Column(
+                      children: [
+                        GestureDetector(
+                          onTap: () => _openProfile(userData),
+                          child: _buildSlimProfileHeader(userData, currentExp),
+                        ),
+                        const SizedBox(height: 10),
+                        _buildSlimProgressBar(
+                          LevelService.getLevelProgress(currentExp),
+                        ),
+                        const SizedBox(height: 25),
+                        _buildScrollableRanking(userData['uid']),
+                        const SizedBox(height: 20),
+                        _buildQuizButton(currentExp),
+                      ],
                     ),
                   ),
                 ),
@@ -166,116 +108,33 @@ class _HomeScreenState extends State<QuizHomeScreen>
     );
   }
 
-  // --- UI 구성 요소 ---
+  // --- UI Helper Methods (클래스 내부에 포함) ---
 
-  Widget _buildScrollableRanking(String? myUid) {
-    return Container(
-      height: 300,
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FF),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Theme(
-        data: Theme.of(context).copyWith(
-          scrollbarTheme: ScrollbarThemeData(
-            thumbColor: WidgetStateProperty.all(
-              const Color(0xFF7B61FF).withOpacity(0.3),
-            ),
-            radius: const Radius.circular(10),
-          ),
-        ),
-        child: Scrollbar(
-          controller: _rankingScrollController,
-          thumbVisibility: true,
-          child: SingleChildScrollView(
-            controller: _rankingScrollController,
-            physics: const BouncingScrollPhysics(),
-            child: RankingSystem(myUid: myUid),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuizButton(BuildContext context, int exp) {
-    return Container(
-      width: double.infinity,
-      height: 60,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF7B61FF).withOpacity(0.4),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: ElevatedButton(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => QuizScreen(initialExp: exp)),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF7B61FF),
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          elevation: 0,
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.play_circle_fill),
-            SizedBox(width: 10),
-            Text(
-              "나도 랭킹 올리기 (퀴즈 시작)",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  BoxDecoration _sheetDecoration() => const BoxDecoration(
-    color: Colors.white,
-    borderRadius: BorderRadius.only(
-      topLeft: Radius.circular(40),
-      topRight: Radius.circular(40),
-    ),
-    boxShadow: [
-      BoxShadow(color: Colors.black12, blurRadius: 15, offset: Offset(0, -5)),
-    ],
-  );
-
-  Widget _buildBackground(double height) => Positioned(
+  Widget _buildBackground(double h) => Positioned(
     top: 0,
     left: 0,
     right: 0,
-    height: height,
+    height: h,
     child: Image.asset('assets/images/background.jpg', fit: BoxFit.fill),
   );
 
-  Widget _buildAnimatedFish(int level, double bgHeight) => AnimatedBuilder(
+  Widget _buildAnimatedFish(int lvl, double h) => AnimatedBuilder(
     animation: _floatController,
     builder: (context, child) => Positioned(
+      top: (h * 0.15) + (_floatController.value * 15),
       left: 0,
       right: 0,
-      top: (bgHeight * 0.18) + (_floatController.value * 20),
       child: Center(
-        child: Image.asset('assets/images/fish_$level.png', width: 160),
+        child: Image.asset('assets/images/fish_$lvl.png', width: 130),
       ),
     ),
   );
 
-  Widget _buildTopSearchButton(BuildContext context) => Positioned(
-    top: 50,
+  Widget _buildTopSearchButton() => Positioned(
+    top: 45,
     right: 20,
     child: CircleAvatar(
-      backgroundColor: Colors.black.withOpacity(0.2),
+      backgroundColor: Colors.black26,
       child: IconButton(
         icon: const Icon(Icons.person_add, color: Colors.white),
         onPressed: () => Navigator.push(
@@ -286,42 +145,34 @@ class _HomeScreenState extends State<QuizHomeScreen>
     ),
   );
 
-  Widget _buildProfileHeader(
-    Map<String, dynamic> userData,
-    String levelName,
-    int exp,
-  ) => Row(
+  Widget _buildSlimProfileHeader(Map<String, dynamic> data, int exp) => Row(
     children: [
       CircleAvatar(
-        radius: 28,
-        backgroundImage: userData['profileUrl'] != null
-            ? NetworkImage(userData['profileUrl'])
+        radius: 22,
+        backgroundImage: data['profileUrl'] != null
+            ? NetworkImage(data['profileUrl'])
             : const AssetImage('assets/images/default_profile.png')
                   as ImageProvider,
       ),
-      const SizedBox(width: 15),
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            userData['nickname'] ?? "익명",
-            style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-          ),
-          Text(
-            levelName,
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2D1B69),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              data['nickname'] ?? "익명",
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
-          ),
-        ],
+            Text(
+              LevelService.getLevelName(LevelService.getLevel(exp)),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
       ),
-      const Spacer(),
       Text(
         "Lv.${LevelService.getLevel(exp)}",
         style: const TextStyle(
-          fontSize: 18,
           color: Color(0xFF7B61FF),
           fontWeight: FontWeight.bold,
         ),
@@ -329,62 +180,65 @@ class _HomeScreenState extends State<QuizHomeScreen>
     ],
   );
 
-  Widget _buildProgressBar(double progress) => Container(
-    padding: const EdgeInsets.all(11),
-    decoration: BoxDecoration(
-      color: const Color(0xFFF8F9FF),
-      borderRadius: BorderRadius.circular(24),
-    ),
-    child: Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              "레벨 진척도",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-            ),
-            Text(
-              "${(progress * 100).toInt()}%",
-              style: const TextStyle(
-                color: Color(0xFF7B61FF),
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-          ],
+  Widget _buildSlimProgressBar(double p) => Row(
+    children: [
+      const Text(
+        "EXP",
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF7B61FF),
         ),
-        const SizedBox(height: 10),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: LinearProgressIndicator(
-            value: progress,
-            minHeight: 10,
-            backgroundColor: Colors.white,
-            color: const Color(0xFF7B61FF),
-          ),
+      ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: LinearProgressIndicator(
+          value: p,
+          minHeight: 6,
+          backgroundColor: Colors.black12,
+          color: const Color(0xFF7B61FF),
         ),
-      ],
-    ),
+      ),
+      const SizedBox(width: 10),
+      Text("${(p * 10).toInt()}%"),
+    ],
   );
 
-  Widget _buildSectionTitle(String title) => Align(
-    alignment: Alignment.centerLeft,
-    child: Text(
-      title,
-      style: const TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: Color(0xFF2D1B69),
+  Widget _buildScrollableRanking(String? uid) => SizedBox(
+    height: 280,
+    child: Scrollbar(
+      controller: _rankingScrollController,
+      child: SingleChildScrollView(
+        controller: _rankingScrollController,
+        child: RankingSystem(myUid: uid),
       ),
     ),
   );
 
-  Widget _buildLogoutButton(BuildContext context) => TextButton(
-    onPressed: () async {
-      await _authService.signOut();
-      if (mounted) Navigator.pushReplacementNamed(context, '/login');
-    },
-    child: Text("로그아웃", style: TextStyle(color: Colors.grey.shade400)),
+  Widget _buildQuizButton(int exp) => SizedBox(
+    width: double.infinity,
+    height: 55,
+    child: ElevatedButton(
+      onPressed: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => QuizScreen(initialExp: exp)),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF7B61FF),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      ),
+      child: const Text(
+        "퀴즈 시작 🚀",
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      ),
+    ),
   );
-}
+
+  BoxDecoration _sheetDecoration() => const BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.only(
+      topLeft: Radius.circular(35),
+      topRight: Radius.circular(35),
+    ),
+  );
+} // <--- 클래스 닫기
