@@ -32,8 +32,9 @@ class DatabaseService {
         'profileUrl': profileUrl,
         'score': FieldValue.increment(0),
         'categories': initialStats,
-        'followerCount': 0, // 💡 초기 카운트 추가
-        'followingCount': 0, // 💡 초기 카운트 추가
+        'followerCount': 0,
+        'followingCount': 0,
+        'attendance': {}, // 💡 [추가] 잔디 데이터를 위한 빈 Map 초기화
         'createdAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
@@ -44,7 +45,7 @@ class DatabaseService {
     }
   }
 
-  // 2. 전체 랭킹 스트림 (기존 유지)
+  // 2. 전체 랭킹 스트림 (유지)
   Stream<List<Map<String, dynamic>>> get rankingStream {
     return _db
         .collection('users')
@@ -57,7 +58,7 @@ class DatabaseService {
         });
   }
 
-  // 3. 유저 검색 (닉네임 기준 - 기존 유지)
+  // 3. 유저 검색 (닉네임 기준 - 유지)
   Future<List<Map<String, dynamic>>> searchUsers(String query) async {
     if (query.isEmpty) return [];
     try {
@@ -77,8 +78,7 @@ class DatabaseService {
     }
   }
 
-  // 4. 팔로우/언팔로우 (서브 컬렉션 & 카운트 동시 업데이트)
-  // 💡 Batch를 사용하여 내 정보와 상대방 정보를 동시에 안전하게 바꿉니다.
+  // 4. 팔로우/언팔로우 (유지)
   Future<void> toggleFollow(String targetUid, bool isFollowing) async {
     if (uid == null) return;
 
@@ -110,15 +110,13 @@ class DatabaseService {
       }
 
       await batch.commit();
-
-      // 💡 팔로우/언팔로우 작업이 끝난 직후 동기화 호출!
       await syncFollowCounts();
     } catch (e) {
       debugPrint("❌ 토글 에러: $e");
     }
   }
 
-  // 5. 실시간 팔로우 여부 확인 (기존 유지)
+  // 5. 실시간 팔로우 여부 확인 (유지)
   Stream<bool> isFollowingStream(String targetUid) {
     if (uid == null) return Stream.value(false);
     return _db
@@ -130,7 +128,7 @@ class DatabaseService {
         .map((doc) => doc.exists);
   }
 
-  // 6. 친구 전용 랭킹 스트림 (기존 유지)
+  // 6. 친구 전용 랭킹 스트림 (유지)
   Stream<List<Map<String, dynamic>>> get friendRankingStream {
     if (uid == null) return Stream.value([]);
 
@@ -145,7 +143,6 @@ class DatabaseService {
               .toList();
           followingIds.add(uid!);
 
-          // whereIn은 최대 10개까지 지원하므로 주의 (친구가 10명 넘어가면 다른 방식 필요)
           final rankingSnap = await _db
               .collection('users')
               .where('uid', whereIn: followingIds)
@@ -156,18 +153,21 @@ class DatabaseService {
         });
   }
 
-  // 7. 퀴즈 결과 누적 업데이트 (기존 유지)
+  // 7. 퀴즈 결과 누적 및 잔디 심기 업데이트 (개선)
   Future<void> updateQuizResults(
     Map<String, Map<String, int>> sessionStats,
     int newExp,
+    int totalCorrect, // 💡 [추가] 이번 세션 총 정답 수
   ) async {
     if (uid == null) return;
 
     WriteBatch batch = _db.batch();
     DocumentReference userRef = _db.collection('users').doc(uid);
 
+    // 경험치 업데이트
     batch.update(userRef, {'score': newExp});
 
+    // 카테고리별 통계 업데이트
     sessionStats.forEach((category, stats) {
       batch.update(userRef, {
         'categories.$category.total': FieldValue.increment(stats['total']!),
@@ -175,39 +175,41 @@ class DatabaseService {
       });
     });
 
+    // 💡 [추가] 오늘 날짜의 잔디 농도를 정답 수만큼 증가
+    String today = DateTime.now().toString().split(' ')[0];
+    batch.update(userRef, {
+      'attendance.$today': FieldValue.increment(totalCorrect),
+    });
+
     await batch.commit();
+    debugPrint("✅ 퀴즈 결과 및 잔디 업데이트 성공: 정답 $totalCorrect개");
   }
 
-  // 8. 실시간 유저 데이터 스트림
+  // 8. 실시간 유저 데이터 스트림 (유지)
   Stream<DocumentSnapshot> get userDataStream {
     if (uid == null) return const Stream.empty();
     return _db.collection('users').doc(uid!).snapshots();
   }
 
-  // 동기화 함수 보완
+  // 9. 동기화 함수 보완 (유지)
   Future<void> syncFollowCounts() async {
     if (uid == null) return;
 
     try {
-      // 1. 내 팔로잉 서브 컬렉션 문서 개수 확인
       QuerySnapshot followingSnap = await _db
           .collection('users')
           .doc(uid)
           .collection('following')
           .get();
-
-      // 2. 내 팔로워 서브 컬렉션 문서 개수 확인
       QuerySnapshot followerSnap = await _db
           .collection('users')
           .doc(uid)
           .collection('followers')
           .get();
 
-      // 3. 음수 방지 및 정확한 개수 계산
       int actualFollowing = followingSnap.docs.length;
       int actualFollowers = followerSnap.docs.length;
 
-      // 4. 내 문서 업데이트
       await _db.collection('users').doc(uid).update({
         'followingCount': actualFollowing < 0 ? 0 : actualFollowing,
         'followerCount': actualFollowers < 0 ? 0 : actualFollowers,

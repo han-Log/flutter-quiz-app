@@ -138,13 +138,20 @@ class _QuizScreenState extends State<QuizScreen>
 
   void _finishQuiz() async {
     setState(() => _isLoading = true);
-    // [유지] 경험치와 통계 한 번에 업데이트
-    await _dbService.updateQuizResults(_sessionCategoryStats, _currentExp);
+
+    // 💡 [개선] 정답 수(_correctCount)를 함께 전달하여 잔디 데이터를 업데이트합니다.
+    await _dbService.updateQuizResults(
+      _sessionCategoryStats,
+      _currentExp,
+      _correctCount, // DatabaseService에 추가된 세 번째 인자
+    );
 
     if (!mounted) return;
 
     int finalLevel = LevelService.getLevel(_currentExp);
     String finalName = LevelService.getLevelName(finalLevel);
+
+    setState(() => _isLoading = false);
 
     showDialog(
       context: context,
@@ -155,7 +162,7 @@ class _QuizScreenState extends State<QuizScreen>
         content: Text(
           "총 $_correctCount문제를 맞혔습니다!\n"
           "최종 등급: $finalName (Lv.$finalLevel)\n\n"
-          "성장 데이터가 저장되었습니다.",
+          "성장 데이터와 잔디가 저장되었습니다.",
           textAlign: TextAlign.center,
         ),
         actions: [
@@ -207,7 +214,6 @@ class _QuizScreenState extends State<QuizScreen>
       ),
       body: Stack(
         children: [
-          // 1. 배경 이미지 (HomeScreen과 동일)
           Positioned(
             top: 0,
             left: 0,
@@ -220,12 +226,10 @@ class _QuizScreenState extends State<QuizScreen>
             ),
           ),
 
-          // 2. 캐릭터 (애니메이션 적용)
           _buildAnimatedFish(displayLevel, backgroundHeight),
 
-          // 3. 하단 카드 (퀴즈 내용)
           Positioned(
-            top: backgroundHeight - 70, // HomeScreen과 간격 동일화
+            top: backgroundHeight - 70,
             left: 0,
             right: 0,
             bottom: 0,
@@ -253,11 +257,9 @@ class _QuizScreenState extends State<QuizScreen>
                   padding: const EdgeInsets.fromLTRB(24, 25, 24, 20),
                   child: Column(
                     children: [
-                      // 진행바 헤더
                       _buildHeader(currentLevel),
                       const SizedBox(height: 25),
 
-                      // 문제 영역
                       Expanded(
                         child: SingleChildScrollView(
                           physics: const BouncingScrollPhysics(),
@@ -283,7 +285,6 @@ class _QuizScreenState extends State<QuizScreen>
                               ),
                               const SizedBox(height: 35),
 
-                              // 선택지 버튼 리스트
                               ...List.generate(
                                 quiz.options.length,
                                 (i) => _buildOptionButton(i, quiz.options[i]),
