@@ -10,7 +10,6 @@ import 'screens/main_screen.dart'; // 💡 MainScreen 임포트 추가
 void main() async {
   // .env 파일 로드
   await dotenv.load(fileName: ".env");
-
   WidgetsFlutterBinding.ensureInitialized();
 
   // 파이어베이스 초기화

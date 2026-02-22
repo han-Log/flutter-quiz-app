@@ -6,7 +6,13 @@ import '../services/level_service.dart';
 
 class QuizScreen extends StatefulWidget {
   final int initialExp;
-  const QuizScreen({super.key, required this.initialExp});
+  final List<String> selectedCategories; // 💡 추가
+
+  const QuizScreen({
+    super.key,
+    required this.initialExp,
+    required this.selectedCategories,
+  });
 
   @override
   State<QuizScreen> createState() => _QuizScreenState();
@@ -24,7 +30,6 @@ class _QuizScreenState extends State<QuizScreen>
   late int _currentExp;
   bool _isLoading = true;
 
-  // [유지] 카테고리별 정답 현황 기록 맵
   final Map<String, Map<String, int>> _sessionCategoryStats = {};
 
   @override
@@ -32,8 +37,6 @@ class _QuizScreenState extends State<QuizScreen>
     super.initState();
     _currentExp = widget.initialExp;
     _loadQuizzes();
-
-    // [추가] 금붕어 애니메이션
     _floatController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -48,7 +51,10 @@ class _QuizScreenState extends State<QuizScreen>
 
   void _loadQuizzes() async {
     try {
-      final quizzes = await _quizService.generateQuizzes();
+      // 💡 선택된 카테고리를 서비스에 전달
+      final quizzes = await _quizService.generateQuizzes(
+        widget.selectedCategories,
+      );
       setState(() {
         _quizzes = quizzes;
         _isLoading = false;
@@ -63,7 +69,6 @@ class _QuizScreenState extends State<QuizScreen>
     final String category = currentQuiz.category;
     bool isCorrect = index == currentQuiz.answerIndex;
 
-    // [유지] 카테고리별 통계 데이터 수집
     if (!_sessionCategoryStats.containsKey(category)) {
       _sessionCategoryStats[category] = {'total': 0, 'correct': 0};
     }
@@ -79,7 +84,6 @@ class _QuizScreenState extends State<QuizScreen>
       });
     }
 
-    // [디자인 변경] 정답/오답 결과 팝업 스타일링
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -138,68 +142,24 @@ class _QuizScreenState extends State<QuizScreen>
 
   void _finishQuiz() async {
     setState(() => _isLoading = true);
-
-    // 💡 [개선] 정답 수(_correctCount)를 함께 전달하여 잔디 데이터를 업데이트합니다.
     await _dbService.updateQuizResults(
       _sessionCategoryStats,
       _currentExp,
-      _correctCount, // DatabaseService에 추가된 세 번째 인자
+      _correctCount,
     );
-
     if (!mounted) return;
-
-    int finalLevel = LevelService.getLevel(_currentExp);
-    String finalName = LevelService.getLevelName(finalLevel);
-
-    setState(() => _isLoading = false);
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("🎓 퀴즈 완료!", textAlign: TextAlign.center),
-        content: Text(
-          "총 $_correctCount문제를 맞혔습니다!\n"
-          "최종 등급: $finalName (Lv.$finalLevel)\n\n"
-          "성장 데이터와 잔디가 저장되었습니다.",
-          textAlign: TextAlign.center,
-        ),
-        actions: [
-          Center(
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF7B61FF),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: () {
-                Navigator.pop(ctx);
-                Navigator.pop(context, _currentExp);
-              },
-              child: const Text(
-                "홈으로 돌아가기",
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    Navigator.pop(context, _currentExp);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    if (_isLoading)
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
 
     final screenHeight = MediaQuery.of(context).size.height;
     final double backgroundHeight = screenHeight * 0.35;
     final quiz = _quizzes[_currentIndex];
     int currentLevel = LevelService.getLevel(_currentExp);
-    int displayLevel = LevelService.getSafeLevel(currentLevel);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -222,12 +182,12 @@ class _QuizScreenState extends State<QuizScreen>
             child: Image.asset(
               'assets/images/background.jpg',
               fit: BoxFit.fill,
-              alignment: Alignment.bottomCenter,
             ),
           ),
-
-          _buildAnimatedFish(displayLevel, backgroundHeight),
-
+          _buildAnimatedFish(
+            LevelService.getSafeLevel(currentLevel),
+            backgroundHeight,
+          ),
           Positioned(
             top: backgroundHeight - 70,
             left: 0,
@@ -240,61 +200,45 @@ class _QuizScreenState extends State<QuizScreen>
                   topLeft: Radius.circular(40),
                   topRight: Radius.circular(40),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 15,
-                    offset: Offset(0, -5),
-                  ),
-                ],
               ),
-              child: ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(40),
-                  topRight: Radius.circular(40),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 25, 24, 20),
-                  child: Column(
-                    children: [
-                      _buildHeader(currentLevel),
-                      const SizedBox(height: 25),
-
-                      Expanded(
-                        child: SingleChildScrollView(
-                          physics: const BouncingScrollPhysics(),
-                          child: Column(
-                            children: [
-                              Text(
-                                "Q${_currentIndex + 1}. [${quiz.category}]",
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF7B61FF),
-                                ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 25, 24, 20),
+                child: Column(
+                  children: [
+                    _buildHeader(currentLevel),
+                    const SizedBox(height: 25),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: [
+                            Text(
+                              "Q${_currentIndex + 1}. [${quiz.category}]",
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF7B61FF),
                               ),
-                              const SizedBox(height: 12),
-                              Text(
-                                quiz.question,
-                                style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF2D1B69),
-                                ),
-                                textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              quiz.question,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF2D1B69),
                               ),
-                              const SizedBox(height: 35),
-
-                              ...List.generate(
-                                quiz.options.length,
-                                (i) => _buildOptionButton(i, quiz.options[i]),
-                              ),
-                            ],
-                          ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 35),
+                            ...List.generate(
+                              quiz.options.length,
+                              (i) => _buildOptionButton(i, quiz.options[i]),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -304,87 +248,69 @@ class _QuizScreenState extends State<QuizScreen>
     );
   }
 
-  Widget _buildAnimatedFish(int displayLevel, double backgroundHeight) {
-    return AnimatedBuilder(
-      animation: _floatController,
-      builder: (context, child) {
-        return Positioned(
-          left: 0,
-          right: 0,
-          top: (backgroundHeight * 0.18) + (_floatController.value * 20),
-          child: Center(
-            child: Image.asset(
-              'assets/images/fish_$displayLevel.png',
-              width: 160,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) =>
-                  Image.asset('assets/images/fish_1.png', width: 160),
-            ),
-          ),
-        );
-      },
-    );
-  }
+  Widget _buildAnimatedFish(int lvl, double h) => AnimatedBuilder(
+    animation: _floatController,
+    builder: (context, child) => Positioned(
+      left: 0,
+      right: 0,
+      top: (h * 0.18) + (_floatController.value * 20),
+      child: Center(
+        child: Image.asset('assets/images/fish_$lvl.png', width: 160),
+      ),
+    ),
+  );
 
-  Widget _buildHeader(int currentLevel) {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              "Lv.$currentLevel ${LevelService.getLevelName(currentLevel)}",
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2D1B69),
-              ),
+  Widget _buildHeader(int lvl) => Column(
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            "Lv.$lvl ${LevelService.getLevelName(lvl)}",
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2D1B69),
             ),
-            Text(
-              "문항 ${_currentIndex + 1} / ${_quizzes.length}",
-              style: const TextStyle(
-                color: Color(0xFF7B61FF),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: LinearProgressIndicator(
-            value: (_currentIndex + 1) / _quizzes.length,
-            minHeight: 8,
-            backgroundColor: const Color(0xFFF8F9FF),
-            color: const Color(0xFF7B61FF),
           ),
-        ),
-      ],
-    );
-  }
+          Text(
+            "문항 ${_currentIndex + 1} / ${_quizzes.length}",
+            style: const TextStyle(
+              color: Color(0xFF7B61FF),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 10),
+      LinearProgressIndicator(
+        value: (_currentIndex + 1) / _quizzes.length,
+        minHeight: 8,
+        backgroundColor: const Color(0xFFF8F9FF),
+        color: const Color(0xFF7B61FF),
+      ),
+    ],
+  );
 
-  Widget _buildOptionButton(int index, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: SizedBox(
-        width: double.infinity,
-        height: 60,
-        child: ElevatedButton(
-          onPressed: () => _handleAnswer(index),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: const Color(0xFF2D1B69),
-            elevation: 0,
-            side: BorderSide(color: Colors.grey.shade200, width: 2),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-            ),
+  Widget _buildOptionButton(int index, String text) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: SizedBox(
+      width: double.infinity,
+      height: 60,
+      child: ElevatedButton(
+        onPressed: () => _handleAnswer(index),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF2D1B69),
+          side: BorderSide(color: Colors.grey.shade200, width: 2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
           ),
-          child: Text(
-            text,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500),
-          ),
+        ),
+        child: Text(
+          text,
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500),
         ),
       ),
-    );
-  }
+    ),
+  );
 }

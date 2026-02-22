@@ -16,9 +16,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final AuthService _authService = AuthService();
   bool _rememberMe = false;
-  bool _isLoading = false; // 💡 로딩 상태 관리를 위한 변수 추가
+  bool _isLoading = false;
 
-  // 💡 공통 스낵바 알림 함수
   void _showSnack(String msg, {bool isError = true}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -29,7 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // 💡 로그인 통합 로직
+  // 💡 로그인 통합 로직 수정
   Future<void> _handleLogin(Future<String?> loginMethod) async {
     setState(() => _isLoading = true);
 
@@ -39,12 +38,12 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = false);
 
     if (errorMsg == null) {
-      // ✅ 성공 시 홈으로 이동
+      // ✅ 수정된 부분: '/home'이 아니라 '/main'으로 이동해야 합니다.
+      // 이렇게 해야 BottomNavigationBar가 있는 MainScreen이 뜹니다.
       if (FirebaseAuth.instance.currentUser != null) {
-        Navigator.pushReplacementNamed(context, '/home');
+        Navigator.pushReplacementNamed(context, '/main');
       }
     } else {
-      // ❌ 실패 시 한글 에러 메시지 출력
       _showSnack(errorMsg);
     }
   }
@@ -261,7 +260,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // UI 빌더 함수들은 그대로 유지합니다.
   Widget _buildLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),

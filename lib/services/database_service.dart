@@ -5,60 +5,51 @@ import 'package:flutter/foundation.dart';
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // 💡 현재 로그인된 유저의 UID를 안전하게 가져오기
+  // 💡 기존 필드 및 Getter 유지
   String? get uid => FirebaseAuth.instance.currentUser?.uid;
+  final int _rankLimit = 9; // 랭킹 표시 제한
 
-  // 1. 회원가입/로그인 시 유저 데이터 생성 및 보완
+  // [기존 1] 유저 데이터 초기화
   Future<void> initializeUserData(
     String email,
     String nickname, {
     String? profileUrl,
   }) async {
-    if (uid == null) {
-      debugPrint("❌ initializeUserData 실패: 로그인된 UID가 없음");
-      return;
-    }
-
+    if (uid == null) return;
     final categories = ['사회', '인문', '예술', '역사', '경제', '과학', '일상'];
     Map<String, dynamic> initialStats = {
       for (var cat in categories) cat: {'total': 0, 'correct': 0},
     };
-
     try {
       await _db.collection('users').doc(uid).set({
         'uid': uid,
         'email': email,
         'nickname': nickname,
         'profileUrl': profileUrl,
-        'score': FieldValue.increment(0),
+        'score': 0,
         'categories': initialStats,
         'followerCount': 0,
         'followingCount': 0,
-        'attendance': {}, // 💡 [추가] 잔디 데이터를 위한 빈 Map 초기화
+        'attendance': {},
         'createdAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-
-      debugPrint("✅ Firestore 유저 데이터 생성/업데이트 성공: $uid");
     } catch (e) {
-      debugPrint("❌ Firestore 데이터 저장 에러: $e");
-      rethrow;
+      debugPrint("❌ 유저 초기화 에러: $e");
     }
   }
 
-  // 2. 전체 랭킹 스트림 (유지)
+  // [기존 2] 전체 랭킹 스트림 (정렬 기준 유지)
   Stream<List<Map<String, dynamic>>> get rankingStream {
     return _db
         .collection('users')
         .orderBy('score', descending: true)
         .orderBy('createdAt', descending: false)
-        .limit(25)
+        .limit(_rankLimit)
         .snapshots()
-        .map((snapshot) {
-          return snapshot.docs.map((doc) => doc.data()).toList();
-        });
+        .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
   }
 
-  // 3. 유저 검색 (닉네임 기준 - 유지)
+  // [기존 3] 유저 검색 (다른 화면에서 사용)
   Future<List<Map<String, dynamic>>> searchUsers(String query) async {
     if (query.isEmpty) return [];
     try {
@@ -67,21 +58,18 @@ class DatabaseService {
           .where('nickname', isGreaterThanOrEqualTo: query)
           .where('nickname', isLessThanOrEqualTo: '$query\uf8ff')
           .get();
-
       return snap.docs
           .map((doc) => doc.data())
           .where((data) => data['uid'] != uid)
           .toList();
     } catch (e) {
-      debugPrint("❌ 유저 검색 에러: $e");
       return [];
     }
   }
 
-  // 4. 팔로우/언팔로우 (유지)
+  // [기존 4] 팔로우/언팔로우 (다른 화면에서 사용)
   Future<void> toggleFollow(String targetUid, bool isFollowing) async {
     if (uid == null) return;
-
     WriteBatch batch = _db.batch();
     DocumentReference myFollowingRef = _db
         .collection('users')
@@ -93,7 +81,6 @@ class DatabaseService {
         .doc(targetUid)
         .collection('followers')
         .doc(uid);
-
     try {
       if (isFollowing) {
         batch.delete(myFollowingRef);
@@ -108,7 +95,6 @@ class DatabaseService {
           'followedAt': FieldValue.serverTimestamp(),
         });
       }
-
       await batch.commit();
       await syncFollowCounts();
     } catch (e) {
@@ -116,7 +102,7 @@ class DatabaseService {
     }
   }
 
-  // 5. 실시간 팔로우 여부 확인 (유지)
+  // [기존 5] 팔로우 여부 확인
   Stream<bool> isFollowingStream(String targetUid) {
     if (uid == null) return Stream.value(false);
     return _db
@@ -128,10 +114,9 @@ class DatabaseService {
         .map((doc) => doc.exists);
   }
 
-  // 6. 친구 전용 랭킹 스트림 (유지)
+  // [기존 6] 친구 전용 랭킹 스트림
   Stream<List<Map<String, dynamic>>> get friendRankingStream {
     if (uid == null) return Stream.value([]);
-
     return _db
         .collection('users')
         .doc(uid)
@@ -142,82 +127,97 @@ class DatabaseService {
               .map((doc) => doc.id)
               .toList();
           followingIds.add(uid!);
-
+          if (followingIds.isEmpty) return [];
           final rankingSnap = await _db
               .collection('users')
-              .where('uid', whereIn: followingIds)
+              .where('uid', whereIn: followingIds.take(30).toList())
               .orderBy('score', descending: true)
               .get();
-
           return rankingSnap.docs.map((doc) => doc.data()).toList();
         });
   }
 
-  // 7. 퀴즈 결과 누적 및 잔디 심기 업데이트 (개선)
+  // [기존 7] 퀴즈 결과 누적
   Future<void> updateQuizResults(
     Map<String, Map<String, int>> sessionStats,
     int newExp,
-    int totalCorrect, // 💡 [추가] 이번 세션 총 정답 수
+    int totalCorrect,
   ) async {
     if (uid == null) return;
-
     WriteBatch batch = _db.batch();
     DocumentReference userRef = _db.collection('users').doc(uid);
-
-    // 경험치 업데이트
-    batch.update(userRef, {'score': newExp});
-
-    // 카테고리별 통계 업데이트
+    batch.update(userRef, {'score': FieldValue.increment(newExp)});
     sessionStats.forEach((category, stats) {
       batch.update(userRef, {
         'categories.$category.total': FieldValue.increment(stats['total']!),
         'categories.$category.correct': FieldValue.increment(stats['correct']!),
       });
     });
-
-    // 💡 [추가] 오늘 날짜의 잔디 농도를 정답 수만큼 증가
     String today = DateTime.now().toString().split(' ')[0];
     batch.update(userRef, {
       'attendance.$today': FieldValue.increment(totalCorrect),
     });
-
     await batch.commit();
-    debugPrint("✅ 퀴즈 결과 및 잔디 업데이트 성공: 정답 $totalCorrect개");
   }
 
-  // 8. 실시간 유저 데이터 스트림 (유지)
+  // [기존 8] 실시간 유저 데이터 스트림
   Stream<DocumentSnapshot> get userDataStream {
     if (uid == null) return const Stream.empty();
     return _db.collection('users').doc(uid!).snapshots();
   }
 
-  // 9. 동기화 함수 보완 (유지)
+  // [기존 9] 팔로워 숫자 동기화
   Future<void> syncFollowCounts() async {
     if (uid == null) return;
-
     try {
-      QuerySnapshot followingSnap = await _db
+      final followingSnap = await _db
           .collection('users')
           .doc(uid)
           .collection('following')
           .get();
-      QuerySnapshot followerSnap = await _db
+      final followerSnap = await _db
           .collection('users')
           .doc(uid)
           .collection('followers')
           .get();
-
-      int actualFollowing = followingSnap.docs.length;
-      int actualFollowers = followerSnap.docs.length;
-
       await _db.collection('users').doc(uid).update({
-        'followingCount': actualFollowing < 0 ? 0 : actualFollowing,
-        'followerCount': actualFollowers < 0 ? 0 : actualFollowers,
+        'followingCount': followingSnap.docs.length,
+        'followerCount': followerSnap.docs.length,
       });
+    } catch (e) {}
+  }
 
-      debugPrint("🔄 동기화 완료: 팔로잉 $actualFollowing, 팔로워 $actualFollowers");
+  // [기능 보강 10] 내 순위 계산 (동점자 처리 추가하여 3위 버그 해결)
+  Future<int> getMyRank() async {
+    if (uid == null) return 0;
+    try {
+      final myDoc = await _db.collection('users').doc(uid).get();
+      if (!myDoc.exists) return 0;
+      final data = myDoc.data()!;
+      final int myScore = data['score'] ?? 0;
+      final Timestamp? myCreatedAt = data['createdAt'] as Timestamp?;
+
+      // 나보다 점수 높은 사람
+      final higherScoreQuery = await _db
+          .collection('users')
+          .where('score', isGreaterThan: myScore)
+          .count()
+          .get();
+      int rankCount = higherScoreQuery.count ?? 0;
+
+      // 점수 같으면 먼저 가입한 사람
+      if (myCreatedAt != null) {
+        final sameScoreQuery = await _db
+            .collection('users')
+            .where('score', isEqualTo: myScore)
+            .where('createdAt', isLessThan: myCreatedAt)
+            .count()
+            .get();
+        rankCount += (sameScoreQuery.count ?? 0);
+      }
+      return rankCount + 1;
     } catch (e) {
-      debugPrint("❌ 동기화 실패: $e");
+      return 0;
     }
   }
 }
