@@ -4,7 +4,7 @@ import '../services/level_service.dart';
 import '../services/database_service.dart';
 import '../widgets/attendance_grass_widget.dart';
 import '../widgets/score_radar_chart.dart';
-import 'following_list_screen.dart'; // 💡 리스트 화면 이동을 위해 임포트
+import 'following_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,9 +26,8 @@ class _HomeScreenState extends State<HomeScreen>
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _dbService.syncFollowCounts();
-    });
+    // 💡 기존의 syncFollowCounts() 삭제!
+    // 이제 앱을 켤 때마다 DB 숫자를 덮어씌우지 않습니다.
   }
 
   @override
@@ -44,29 +43,22 @@ class _HomeScreenState extends State<HomeScreen>
       body: StreamBuilder<DocumentSnapshot>(
         stream: _dbService.userDataStream,
         builder: (context, snapshot) {
+          // 기본값 설정
           int level = 1;
           int score = 0;
           int followerCount = 0;
           int followingCount = 0;
           int totalSolved = 0;
           int totalCorrect = 0;
-          String myUid = ""; // 💡 이동 시 필요한 내 UID
+          String myUid = "";
           Map<String, dynamic> attendance = {};
-
-          final List<String> categoryOrder = [
-            '사회',
-            '인문',
-            '예술',
-            '역사',
-            '경제',
-            '과학',
-            '일상',
-          ];
-          List<double> chartScores = [0, 0, 0, 0, 0, 0, 0];
+          List<double> chartScores = [1, 1, 1, 1, 1, 1, 1];
 
           if (snapshot.hasData && snapshot.data?.data() != null) {
             var userData = snapshot.data!.data() as Map<String, dynamic>;
-            myUid = userData['uid'] ?? ""; // 💡 UID 가져오기
+            myUid = userData['uid'] ?? "";
+
+            // 💡 DB에 저장된 숫자를 그대로 가져와서 보여줍니다.
             score = userData['score'] ?? 0;
             level = LevelService.getLevel(score);
             followerCount = userData['followerCount'] ?? 0;
@@ -80,6 +72,15 @@ class _HomeScreenState extends State<HomeScreen>
               totalCorrect += (value['correct'] as int? ?? 0);
             });
 
+            final List<String> categoryOrder = [
+              '사회',
+              '인문',
+              '예술',
+              '역사',
+              '경제',
+              '과학',
+              '일상',
+            ];
             chartScores = categoryOrder
                 .map((cat) {
                   var stats = categories[cat];
@@ -95,10 +96,8 @@ class _HomeScreenState extends State<HomeScreen>
             child: Column(
               children: [
                 const SizedBox(height: 60),
-                // 💡 내 UID를 넘겨주어 클릭 가능하게 수정
                 _buildHeader(context, myUid, followerCount, followingCount),
                 const SizedBox(height: 20),
-
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Stack(
@@ -113,14 +112,12 @@ class _HomeScreenState extends State<HomeScreen>
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 25),
                 _buildStatCards(totalSolved, totalCorrect),
                 const SizedBox(height: 25),
                 _buildSectionTitle("2026년 학습 리포트"),
                 const SizedBox(height: 12),
                 AttendanceGrassWidget(attendance: attendance),
-
                 const SizedBox(height: 25),
                 _buildAnalysisSection(chartScores),
                 const SizedBox(height: 60),
@@ -155,10 +152,8 @@ class _HomeScreenState extends State<HomeScreen>
           ),
           Row(
             children: [
-              // 💡 클릭 이벤트가 추가된 팔로워 아이템
               _buildFollowItem(context, "팔로워", followers, uid, false),
               const SizedBox(width: 15),
-              // 💡 클릭 이벤트가 추가된 팔로잉 아이템
               _buildFollowItem(context, "팔로잉", following, uid, true),
             ],
           ),
@@ -167,7 +162,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // 💡 클릭 시 FollowingListScreen으로 이동하는 GestureDetector 추가
   Widget _buildFollowItem(
     BuildContext context,
     String label,
@@ -177,7 +171,7 @@ class _HomeScreenState extends State<HomeScreen>
   ) {
     return GestureDetector(
       onTap: () {
-        if (uid.isEmpty) return; // UID가 없으면 이동 방지
+        if (uid.isEmpty) return;
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -190,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen>
         );
       },
       child: Container(
-        color: Colors.transparent, // 클릭 영역 확보
+        color: Colors.transparent,
         child: Column(
           children: [
             Text(
@@ -218,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen>
       borderRadius: BorderRadius.circular(40),
       boxShadow: [
         BoxShadow(
-          color: const Color(0xFF7B61FF).withOpacity(0.12),
+          color: const Color(0xFF7B61FF).withValues(alpha: 0.12),
           blurRadius: 20,
           offset: const Offset(0, 10),
         ),
@@ -247,7 +241,10 @@ class _HomeScreenState extends State<HomeScreen>
         color: Colors.white,
         borderRadius: BorderRadius.circular(30),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 20),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 20,
+          ),
         ],
       ),
       child: Column(
@@ -271,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildLevelBadge(int level, int score) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
     decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.9),
+      color: Colors.white.withValues(alpha: 0.9),
       borderRadius: BorderRadius.circular(20),
     ),
     child: Text(
@@ -310,7 +307,7 @@ class _HomeScreenState extends State<HomeScreen>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withOpacity(0.15)),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
       ),
       child: Column(
         children: [

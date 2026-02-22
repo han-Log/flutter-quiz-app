@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/database_service.dart';
-import 'search_screen.dart'; // 검색 화면으로 이동이 필요한 경우
+import 'search_screen.dart';
 
 class FollowingListScreen extends StatefulWidget {
   final String myUid;
@@ -45,35 +45,50 @@ class _FollowingListScreenState extends State<FollowingListScreen> {
     }
   }
 
+  // 💡 리스트 초기화 및 다시 불러오기 함수
+  Future<void> _refreshList() async {
+    setState(() {
+      _userDocs.clear();
+      _lastDocument = null;
+      _hasMore = true;
+    });
+    await _fetchUsers();
+  }
+
   Future<void> _fetchUsers() async {
     if (_isLoading) return;
     setState(() => _isLoading = true);
 
-    Query query = FirebaseFirestore.instance
-        .collection('users')
-        .doc(widget.myUid)
-        .collection(widget.isFollowingMode ? 'following' : 'followers')
-        .orderBy('followedAt', descending: true)
-        .limit(_limit);
+    try {
+      Query query = FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.myUid)
+          .collection(widget.isFollowingMode ? 'following' : 'followers')
+          // 💡 DatabaseService에서 이 이름과 똑같은 필드('followedAt')를 저장해야 합니다.
+          .orderBy('followedAt', descending: true)
+          .limit(_limit);
 
-    if (_lastDocument != null) {
-      query = query.startAfterDocument(_lastDocument!);
+      if (_lastDocument != null) {
+        query = query.startAfterDocument(_lastDocument!);
+      }
+
+      final querySnapshot = await query.get();
+
+      if (querySnapshot.docs.length < _limit) {
+        _hasMore = false;
+      }
+
+      if (querySnapshot.docs.isNotEmpty) {
+        _lastDocument = querySnapshot.docs.last;
+        setState(() {
+          _userDocs.addAll(querySnapshot.docs);
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching users: $e");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
-
-    final querySnapshot = await query.get();
-
-    if (querySnapshot.docs.length < _limit) {
-      _hasMore = false;
-    }
-
-    if (querySnapshot.docs.isNotEmpty) {
-      _lastDocument = querySnapshot.docs.last;
-      setState(() {
-        _userDocs.addAll(querySnapshot.docs);
-      });
-    }
-
-    setState(() => _isLoading = false);
   }
 
   @override
@@ -100,16 +115,17 @@ class _FollowingListScreenState extends State<FollowingListScreen> {
       ),
       body: Column(
         children: [
-          // 🔍 1. 상단 친구 찾기 바
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: GestureDetector(
-              onTap: () {
-                // 클릭 시 기존에 만들어둔 검색 화면으로 이동
-                Navigator.push(
+              onTap: () async {
+                // 💡 검색 화면으로 갔다가 돌아올 때(pop)를 기다립니다.
+                await Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const SearchScreen()),
                 );
+                // 💡 돌아오면 리스트를 새로고침합니다.
+                _refreshList();
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -134,7 +150,6 @@ class _FollowingListScreenState extends State<FollowingListScreen> {
             ),
           ),
 
-          // 👥 2. 리스트 영역
           Expanded(
             child: _userDocs.isEmpty && !_isLoading
                 ? _buildEmptyState()
@@ -183,7 +198,6 @@ class _FollowingListScreenState extends State<FollowingListScreen> {
                             subtitle: Text(
                               "Lv.${(userData['score'] ?? 0) ~/ 100 + 1}",
                             ),
-                            // 🔘 팔로우/언팔로우 버튼
                             trailing: StreamBuilder<bool>(
                               stream: _dbService.isFollowingStream(targetUid),
                               builder: (context, followSnapshot) {
@@ -193,10 +207,21 @@ class _FollowingListScreenState extends State<FollowingListScreen> {
                                   width: 90,
                                   height: 32,
                                   child: ElevatedButton(
-                                    onPressed: () => _dbService.toggleFollow(
-                                      targetUid,
-                                      isFollowing,
-                                    ),
+                                    onPressed: () async {
+                                      await _dbService.toggleFollow(
+                                        widget.myUid,
+                                        targetUid,
+                                        isFollowing,
+                                      );
+                                      // 팔로우 상태가 변하면 리스트에서 제거하거나 갱신해야 할 수 있음
+                                      if (widget.isFollowingMode &&
+                                          isFollowing) {
+                                        // 언팔로우 한 경우 리스트에서 즉시 제거 (선택 사항)
+                                        setState(() {
+                                          _userDocs.removeAt(index);
+                                        });
+                                      }
+                                    },
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: isFollowing
                                           ? Colors.grey.shade200

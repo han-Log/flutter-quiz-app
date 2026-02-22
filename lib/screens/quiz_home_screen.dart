@@ -4,7 +4,6 @@ import 'quiz_screen.dart';
 import 'search_screen.dart';
 import '../services/level_service.dart';
 import '../services/database_service.dart';
-import '../widgets/profile_detail_sheet.dart';
 
 class QuizHomeScreen extends StatefulWidget {
   const QuizHomeScreen({super.key});
@@ -18,7 +17,6 @@ class _QuizHomeScreenState extends State<QuizHomeScreen>
   final DatabaseService _dbService = DatabaseService();
   late AnimationController _floatController;
 
-  // 💡 카테고리 선택 변수
   final List<String> _allCategories = [
     "사회",
     "인문",
@@ -33,7 +31,7 @@ class _QuizHomeScreenState extends State<QuizHomeScreen>
   @override
   void initState() {
     super.initState();
-    _selectedCategories = List.from(_allCategories); // 초기값: 전체 선택
+    _selectedCategories = List.from(_allCategories);
     _floatController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -46,27 +44,19 @@ class _QuizHomeScreenState extends State<QuizHomeScreen>
     super.dispose();
   }
 
-  void _openProfile(Map<String, dynamic> data) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => ProfileDetailSheet(userData: data),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
-    final double backgroundHeight = screenHeight * 0.35; // 배경 높이 약간 조정
+    final double backgroundHeight = screenHeight * 0.35;
 
     return StreamBuilder<DocumentSnapshot>(
       stream: _dbService.userDataStream,
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (!snapshot.hasData || snapshot.data?.data() == null) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
+        }
 
         var userData = snapshot.data!.data() as Map<String, dynamic>;
         int currentExp = userData['score'] ?? 0;
@@ -93,22 +83,14 @@ class _QuizHomeScreenState extends State<QuizHomeScreen>
                     padding: const EdgeInsets.fromLTRB(28, 30, 28, 30),
                     child: Column(
                       children: [
-                        // 프로필 정보 (클릭 시 상세 프로필)
-                        GestureDetector(
-                          onTap: () => _openProfile(userData),
-                          child: _buildSlimProfileHeader(userData, currentExp),
-                        ),
+                        _buildSlimProfileHeader(userData, currentExp),
                         const SizedBox(height: 15),
                         _buildSlimProgressBar(
                           LevelService.getLevelProgress(currentExp),
                         ),
-
-                        const Spacer(), // 💡 랭킹이 빠진 자리에 유연한 공간 추가
-                        // 학습 영역 선택 영역
+                        const Spacer(),
                         _buildCategorySelector(),
-
-                        const Spacer(), // 💡 요소들 사이의 균형을 위해 공간 분배
-                        // 퀴즈 시작 버튼
+                        const Spacer(),
                         _buildQuizButton(currentExp),
                         const SizedBox(height: 10),
                       ],
@@ -174,8 +156,6 @@ class _QuizHomeScreenState extends State<QuizHomeScreen>
     );
   }
 
-  // --- UI 컴포넌트들 ---
-
   Widget _buildBackground(double h) => Positioned(
     top: 0,
     left: 0,
@@ -211,58 +191,68 @@ class _QuizHomeScreenState extends State<QuizHomeScreen>
     ),
   );
 
-  Widget _buildSlimProfileHeader(Map<String, dynamic> data, int exp) => Row(
-    children: [
-      CircleAvatar(
-        radius: 25,
-        backgroundImage: data['profileUrl'] != null
-            ? NetworkImage(data['profileUrl'])
-            : const AssetImage('assets/images/default_profile.png')
-                  as ImageProvider,
-      ),
-      const SizedBox(width: 15),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildSlimProfileHeader(Map<String, dynamic> data, int exp) {
+    // 💡 에러의 원인 해결: URL이 null이거나 빈 문자열인지 확실히 체크
+    String? profileUrl = data['profileUrl'];
+    bool hasValidUrl =
+        profileUrl != null &&
+        profileUrl.isNotEmpty &&
+        profileUrl.startsWith('http');
+
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 25,
+          backgroundColor: const Color(0xFFF2F4FF),
+          backgroundImage: hasValidUrl
+              ? NetworkImage(profileUrl)
+              : const AssetImage('assets/images/default_profile.png')
+                    as ImageProvider,
+        ),
+        const SizedBox(width: 15),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                data['nickname'] ?? "익명",
+                style: const TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+              Text(
+                LevelService.getLevelName(LevelService.getLevel(exp)),
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2D1B69),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(
-              data['nickname'] ?? "익명",
-              style: const TextStyle(fontSize: 14, color: Colors.grey),
+            const Text(
+              "LEVEL",
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF7B61FF),
+              ),
             ),
             Text(
-              LevelService.getLevelName(LevelService.getLevel(exp)),
+              "${LevelService.getLevel(exp)}",
               style: const TextStyle(
-                fontSize: 22,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF2D1B69),
+                color: Color(0xFF7B61FF),
               ),
             ),
           ],
         ),
-      ),
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          const Text(
-            "LEVEL",
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF7B61FF),
-            ),
-          ),
-          Text(
-            "${LevelService.getLevel(exp)}",
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF7B61FF),
-            ),
-          ),
-        ],
-      ),
-    ],
-  );
+      ],
+    );
+  }
 
   Widget _buildSlimProgressBar(double p) => Column(
     children: [
@@ -304,7 +294,8 @@ class _QuizHomeScreenState extends State<QuizHomeScreen>
       style: ElevatedButton.styleFrom(
         backgroundColor: const Color(0xFF7B61FF),
         elevation: 8,
-        shadowColor: const Color(0xFF7B61FF).withOpacity(0.4),
+        // 💡 [2026-02-22] 규칙 적용: withValues 사용
+        shadowColor: const Color(0xFF7B61FF).withValues(alpha: 0.4),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       child: const Text(

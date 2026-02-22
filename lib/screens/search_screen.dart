@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // 💡 내 UID를 가져오기 위해 추가
 import '../services/database_service.dart';
-import '../widgets/profile_detail_sheet.dart'; // 💡 상세 프로필 위젯 임포트
+import '../widgets/profile_detail_sheet.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -12,16 +13,22 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final _searchController = TextEditingController();
   final DatabaseService _dbService = DatabaseService();
+  // 💡 현재 로그인한 사용자의 UID
+  final String myUid = FirebaseAuth.instance.currentUser?.uid ?? "";
+
   List<Map<String, dynamic>> _searchResults = [];
   bool _isSearching = false;
 
-  // 💡 프로필 상세 바텀 시트를 여는 함수
+  // 💡 프로필 상세 바텀 시트를 여는 함수 (myUid 추가)
   void _openProfileDetail(Map<String, dynamic> user) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => ProfileDetailSheet(userData: user),
+      builder: (context) => ProfileDetailSheet(
+        userData: user,
+        myUid: myUid, // 💡 내 UID 전달
+      ),
     );
   }
 
@@ -161,7 +168,6 @@ class _SearchScreenState extends State<SearchScreen> {
           padding: const EdgeInsets.symmetric(vertical: 12.0),
           child: Row(
             children: [
-              // 💡 프로필 이미지 클릭 시 상세 정보 열기
               GestureDetector(
                 onTap: () => _openProfileDetail(user),
                 child: CircleAvatar(
@@ -174,11 +180,10 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               ),
               const SizedBox(width: 16),
-              // 💡 닉네임 영역 클릭 시 상세 정보 열기
               Expanded(
                 child: GestureDetector(
                   onTap: () => _openProfileDetail(user),
-                  behavior: HitTestBehavior.opaque, // 빈 공간 클릭도 감지
+                  behavior: HitTestBehavior.opaque,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -205,8 +210,9 @@ class _SearchScreenState extends State<SearchScreen> {
               SizedBox(
                 width: 90,
                 child: ElevatedButton(
+                  // 💡 toggleFollow 인자 3개로 수정
                   onPressed: () =>
-                      _dbService.toggleFollow(user['uid'], isFollowing),
+                      _dbService.toggleFollow(myUid, user['uid'], isFollowing),
                   style: ElevatedButton.styleFrom(
                     elevation: 0,
                     backgroundColor: isFollowing
