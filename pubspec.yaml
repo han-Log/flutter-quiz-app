@@ -34,7 +34,7 @@ flutter:
   assets:
     # Images
     - assets/images/background.jpg
-    - assets/images/fish_1.png
+    - assets/images/level_1.png
     - assets/images/
 
     # 제외시킬 파일

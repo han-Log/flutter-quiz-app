@@ -3,10 +3,12 @@ import '../models/quiz_model.dart';
 import '../services/quiz_service.dart';
 import '../services/database_service.dart';
 import '../services/level_service.dart';
+import 'package:login/theme/app_colors.dart';
+import '../widgets/quiz_level_visualizer.dart';
 
 class QuizScreen extends StatefulWidget {
   final int initialExp;
-  final List<String> selectedCategories; // 💡 추가
+  final List<String> selectedCategories;
 
   const QuizScreen({
     super.key,
@@ -49,18 +51,30 @@ class _QuizScreenState extends State<QuizScreen>
     super.dispose();
   }
 
+  /// ✅ [수정된 부분] QuizService에 두 개의 인자를 전달합니다.
   void _loadQuizzes() async {
     try {
-      // 💡 선택된 카테고리를 서비스에 전달
+      // 1. 현재 경험치를 바탕으로 레벨 계산
+      final int userLevel = LevelService.getLevel(_currentExp);
+
+      // 2. [에러 해결 지점] 두 번째 인자인 userLevel을 추가했습니다.
       final quizzes = await _quizService.generateQuizzes(
         widget.selectedCategories,
+        userLevel, // 👈 이 부분이 추가되어야 에러가 사라집니다!
       );
+
       setState(() {
         _quizzes = quizzes;
         _isLoading = false;
       });
     } catch (e) {
       debugPrint("Error loading quizzes: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("퀴즈를 불러오는 데 실패했습니다.")));
+        Navigator.pop(context);
+      }
     }
   }
 
@@ -84,6 +98,10 @@ class _QuizScreenState extends State<QuizScreen>
       });
     }
 
+    _showResultDialog(isCorrect, currentQuiz);
+  }
+
+  void _showResultDialog(bool isCorrect, Quiz currentQuiz) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -92,6 +110,9 @@ class _QuizScreenState extends State<QuizScreen>
         title: Text(
           isCorrect ? "정답! 🎉" : "오답.. 😭",
           textAlign: TextAlign.center,
+          style: TextStyle(
+            color: isCorrect ? AppColors.primaryPurple : Colors.redAccent,
+          ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -100,18 +121,19 @@ class _QuizScreenState extends State<QuizScreen>
               isCorrect
                   ? "경험치가 1 올랐습니다!"
                   : "정답은 '${currentQuiz.options[currentQuiz.answerIndex]}' 입니다.",
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 15),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8F9FF),
+                color: const Color(0xFFF2F4FF),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 "현재 등급: ${LevelService.getLevelName(LevelService.getLevel(_currentExp))}",
                 style: const TextStyle(
-                  color: Color(0xFF7B61FF),
+                  color: AppColors.primaryPurple,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -153,11 +175,12 @@ class _QuizScreenState extends State<QuizScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading)
+    if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     final screenHeight = MediaQuery.of(context).size.height;
-    final double backgroundHeight = screenHeight * 0.35;
+    final double visualizerHeight = screenHeight * 0.35;
     final quiz = _quizzes[_currentIndex];
     int currentLevel = LevelService.getLevel(_currentExp);
 
@@ -172,43 +195,45 @@ class _QuizScreenState extends State<QuizScreen>
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Stack(
+      body: Column(
         children: [
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: backgroundHeight,
-            child: Image.asset(
-              'assets/images/background.jpg',
-              fit: BoxFit.fill,
-            ),
-          ),
-          _buildAnimatedFish(
-            LevelService.getSafeLevel(currentLevel),
-            backgroundHeight,
-          ),
-          Positioned(
-            top: backgroundHeight - 70,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(40),
-                  topRight: Radius.circular(40),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              QuizLevelVisualizer(
+                height: visualizerHeight,
+                level: LevelService.getSafeLevel(currentLevel),
+                floatAnimation: _floatController,
+              ),
+              Positioned(
+                bottom: -1,
+                left: 0,
+                right: 0,
+                child: Container(
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(40),
+                      topRight: Radius.circular(40),
+                    ),
+                  ),
                 ),
               ),
+            ],
+          ),
+          Expanded(
+            child: Container(
+              color: Colors.white,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 25, 24, 20),
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
                 child: Column(
                   children: [
-                    _buildHeader(currentLevel),
+                    _buildQuizHeader(currentLevel),
                     const SizedBox(height: 25),
                     Expanded(
                       child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
                         child: Column(
                           children: [
                             Text(
@@ -216,7 +241,7 @@ class _QuizScreenState extends State<QuizScreen>
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF7B61FF),
+                                color: AppColors.primaryPurple,
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -225,7 +250,7 @@ class _QuizScreenState extends State<QuizScreen>
                               style: const TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF2D1B69),
+                                color: AppColors.deepPurple,
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -248,19 +273,7 @@ class _QuizScreenState extends State<QuizScreen>
     );
   }
 
-  Widget _buildAnimatedFish(int lvl, double h) => AnimatedBuilder(
-    animation: _floatController,
-    builder: (context, child) => Positioned(
-      left: 0,
-      right: 0,
-      top: (h * 0.18) + (_floatController.value * 20),
-      child: Center(
-        child: Image.asset('assets/images/fish_$lvl.png', width: 160),
-      ),
-    ),
-  );
-
-  Widget _buildHeader(int lvl) => Column(
+  Widget _buildQuizHeader(int lvl) => Column(
     children: [
       Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -269,24 +282,27 @@ class _QuizScreenState extends State<QuizScreen>
             "Lv.$lvl ${LevelService.getLevelName(lvl)}",
             style: const TextStyle(
               fontWeight: FontWeight.bold,
-              color: Color(0xFF2D1B69),
+              color: AppColors.deepPurple,
             ),
           ),
           Text(
             "문항 ${_currentIndex + 1} / ${_quizzes.length}",
             style: const TextStyle(
-              color: Color(0xFF7B61FF),
+              color: AppColors.primaryPurple,
               fontWeight: FontWeight.bold,
             ),
           ),
         ],
       ),
       const SizedBox(height: 10),
-      LinearProgressIndicator(
-        value: (_currentIndex + 1) / _quizzes.length,
-        minHeight: 8,
-        backgroundColor: const Color(0xFFF8F9FF),
-        color: const Color(0xFF7B61FF),
+      ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: LinearProgressIndicator(
+          value: (_currentIndex + 1) / _quizzes.length,
+          minHeight: 8,
+          backgroundColor: const Color(0xFFF2F4FF),
+          color: AppColors.primaryPurple,
+        ),
       ),
     ],
   );
@@ -300,7 +316,8 @@ class _QuizScreenState extends State<QuizScreen>
         onPressed: () => _handleAnswer(index),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF2D1B69),
+          foregroundColor: AppColors.deepPurple,
+          elevation: 0,
           side: BorderSide(color: Colors.grey.shade200, width: 2),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),

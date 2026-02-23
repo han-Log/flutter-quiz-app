@@ -41,21 +41,25 @@ class _HomeScreenState extends State<HomeScreen>
       body: StreamBuilder<DocumentSnapshot>(
         stream: _dbService.userDataStream,
         builder: (context, snapshot) {
-          int level = 1;
           int score = 0;
+          int level = 1;
           int followerCount = 0;
           int followingCount = 0;
           int totalSolved = 0;
           int totalCorrect = 0;
           String myUid = "";
           Map<String, dynamic> attendance = {};
-          List<double> chartScores = [1, 1, 1, 1, 1, 1, 1];
+          List<double> chartScores = List.filled(7, 1.0);
 
           if (snapshot.hasData && snapshot.data?.data() != null) {
             var userData = snapshot.data!.data() as Map<String, dynamic>;
             myUid = userData['uid'] ?? "";
+
+            // 💡 실시간 점수 로드
             score = userData['score'] ?? 0;
+            // 💡 점수에 따른 실시간 레벨 계산 (이게 바뀌어야 레벨이 오릅니다)
             level = LevelService.getLevel(score);
+
             followerCount = userData['followerCount'] ?? 0;
             followingCount = userData['followingCount'] ?? 0;
             attendance = userData['attendance'] as Map<String, dynamic>? ?? {};
@@ -99,6 +103,7 @@ class _HomeScreenState extends State<HomeScreen>
                     alignment: Alignment.center,
                     children: [
                       _buildRoundedBackground(),
+                      // 💡 파일명을 level_ 로 변경 (pubspec.yaml 기반)
                       _buildAnimatedFish(LevelService.getSafeLevel(level)),
                       Positioned(
                         bottom: 15,
@@ -133,20 +138,46 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  BoxDecoration _cardDecoration({Color? borderColor}) {
-    return BoxDecoration(
-      color: AppColors.background,
-      borderRadius: AppDesign.cardRadius,
-      border: borderColor != null ? Border.all(color: borderColor) : null,
-      boxShadow: [
-        BoxShadow(
-          color: AppColors.shadowColor,
-          blurRadius: 15,
-          offset: const Offset(0, 8),
+  // --- 빌드 메서드 ---
+
+  Widget _buildAnimatedFish(int safeLevel) {
+    // 💡 pubspec.yaml에 level_1.png가 있으므로 파일명을 level_로 맞춥니다.
+    return AnimatedBuilder(
+      animation: _floatController,
+      builder: (context, child) => Transform.translate(
+        offset: Offset(0, _floatController.value * 15 - 7.5),
+        child: Image.asset(
+          'assets/images/level_$safeLevel.png',
+          width: 140,
+          errorBuilder: (context, error, stackTrace) {
+            debugPrint("❌ 이미지 로드 실패: assets/images/level_$safeLevel.png");
+            return const Icon(
+              Icons.help_outline,
+              size: 100,
+              color: Colors.white70,
+            );
+          },
         ),
-      ],
+      ),
     );
   }
+
+  Widget _buildLevelBadge(int level, int score) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    decoration: BoxDecoration(
+      // [2026-02-22] 규칙 적용
+      color: Colors.white.withValues(alpha: 0.9),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Text(
+      "Lv.$level ${LevelService.getLevelName(level)} ($score pts)",
+      style: const TextStyle(
+        color: AppColors.deepPurple,
+        fontSize: 14,
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+  );
 
   Widget _buildHeader(
     BuildContext context,
@@ -155,21 +186,14 @@ class _HomeScreenState extends State<HomeScreen>
     int following,
   ) {
     return Padding(
-      padding: const EdgeInsets.only(
-        left: 40, // 왼쪽
-        top: 20, // 위
-        right: 30, // 오른쪽
-        bottom: 1, // 아래
-      ), //26
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.start, // 💡 상단 정렬로 변경
         children: [
-          // 💡 제목과 서브타이틀을 세로로 배치
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
+            children: const [
+              Text(
                 "현재 나의 상식 상태",
                 style: TextStyle(
                   fontSize: 20,
@@ -177,13 +201,11 @@ class _HomeScreenState extends State<HomeScreen>
                   color: AppColors.titleTextColor,
                 ),
               ),
-              const SizedBox(height: 0.1), // 제목과 서브타이틀 사이 간격
-              const Text(
-                "현재 나의 상식 수준을 올려보세요",
+              Text(
+                "꾸준한 퀴즈 풀이로 레벨을 올려보세요",
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.explainTextColor, // 흐린 색상 적용
+                  color: AppColors.explainTextColor,
                 ),
               ),
             ],
@@ -205,95 +227,54 @@ class _HomeScreenState extends State<HomeScreen>
     String label,
     int count,
     String uid,
-    bool isFollowingMode,
-  ) {
-    return GestureDetector(
-      onTap: () {
-        if (uid.isEmpty) return;
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => FollowingListScreen(
-              myUid: uid,
-              title: label,
-              isFollowingMode: isFollowingMode,
+    bool isFollowing,
+  ) => GestureDetector(
+    onTap: () => uid.isEmpty
+        ? null
+        : Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (c) => FollowingListScreen(
+                myUid: uid,
+                title: label,
+                isFollowingMode: isFollowing,
+              ),
             ),
           ),
-        );
-      },
-      child: Column(
-        children: [
-          Text(
-            "$count",
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: AppColors.primaryPurple,
-            ),
+    child: Column(
+      children: [
+        Text(
+          "$count",
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppColors.primaryPurple,
           ),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12, color: AppColors.textGrey),
-          ),
-        ],
-      ),
-    );
-  }
+        ),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, color: AppColors.textGrey),
+        ),
+      ],
+    ),
+  );
 
   Widget _buildRoundedBackground() => Container(
     width: double.infinity,
     height: 260,
     decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(50),
+      borderRadius: BorderRadius.circular(40),
       boxShadow: [
         BoxShadow(
           color: AppColors.shadowColor,
-          blurRadius: 25,
-          offset: const Offset(0, 12),
+          blurRadius: 20,
+          offset: const Offset(0, 10),
         ),
       ],
     ),
     child: ClipRRect(
-      borderRadius: AppDesign.cardRadius,
+      borderRadius: BorderRadius.circular(40),
       child: Image.asset('assets/images/background.jpg', fit: BoxFit.cover),
-    ),
-  );
-
-  Widget _buildAnimatedFish(int level) => AnimatedBuilder(
-    animation: _floatController,
-    builder: (context, child) => Transform.translate(
-      offset: Offset(0, _floatController.value * 15 - 7.5),
-      child: Image.asset('assets/images/fish_$level.png', width: 140),
-    ),
-  );
-
-  Widget _buildAnalysisSection(List<double> scores) => Container(
-    width: double.infinity,
-    margin: const EdgeInsets.symmetric(horizontal: 24),
-    padding: const EdgeInsets.all(24),
-    decoration: _cardDecoration(),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 10),
-        SizedBox(height: 220, child: ScoreRadarChart(scores: scores)),
-      ],
-    ),
-  );
-
-  Widget _buildLevelBadge(int level, int score) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
-    decoration: BoxDecoration(
-      color: const Color.fromARGB(7, 255, 255, 255).withValues(alpha: 0.9),
-      borderRadius: BorderRadius.circular(15),
-    ),
-    child: Text(
-      "Lv.$level ${LevelService.getLevelName(level)} ($score pts)",
-      style: const TextStyle(
-        color: AppColors.titleTextColor,
-        fontSize: 13,
-        fontWeight: FontWeight.bold,
-      ),
     ),
   );
 
@@ -319,29 +300,37 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _buildStatBox(String label, String value, Color color) => Expanded(
     child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: _cardDecoration(borderColor: color.withValues(alpha: 0.4)),
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: _cardDecoration(borderColor: color.withValues(alpha: 0.3)),
       child: Column(
         children: [
           Text(
             value,
             style: TextStyle(
-              fontSize: 17,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
               color: color,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           Text(
             label,
             style: const TextStyle(
-              fontSize: 10,
+              fontSize: 11,
               color: AppColors.explainTextColor,
             ),
           ),
         ],
       ),
     ),
+  );
+
+  Widget _buildAnalysisSection(List<double> scores) => Container(
+    width: double.infinity,
+    margin: const EdgeInsets.symmetric(horizontal: 24),
+    padding: const EdgeInsets.all(20),
+    decoration: _cardDecoration(),
+    child: SizedBox(height: 220, child: ScoreRadarChart(scores: scores)),
   );
 
   Widget _buildSectionTitle(String title) => Padding(
@@ -357,5 +346,18 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       ),
     ),
+  );
+
+  BoxDecoration _cardDecoration({Color? borderColor}) => BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(25),
+    border: borderColor != null ? Border.all(color: borderColor) : null,
+    boxShadow: [
+      BoxShadow(
+        color: AppColors.shadowColor,
+        blurRadius: 15,
+        offset: const Offset(0, 8),
+      ),
+    ],
   );
 }

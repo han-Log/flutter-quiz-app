@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'quiz_screen.dart';
 import '../services/level_service.dart';
 import '../services/database_service.dart';
+import 'package:login/theme/app_colors.dart';
+import '../widgets/quiz_level_visualizer.dart';
 
 class QuizHomeScreen extends StatefulWidget {
   const QuizHomeScreen({super.key});
@@ -46,7 +48,7 @@ class _QuizHomeScreenState extends State<QuizHomeScreen>
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
-    final double backgroundHeight = screenHeight * 0.35;
+    final double visualizerHeight = screenHeight * 0.35;
 
     return StreamBuilder<DocumentSnapshot>(
       stream: _dbService.userDataStream,
@@ -63,34 +65,49 @@ class _QuizHomeScreenState extends State<QuizHomeScreen>
 
         return Scaffold(
           backgroundColor: Colors.white,
-          body: Stack(
+          // 💡 Stack의 복잡한 위치 계산 대신 Column + Expanded 구조로 변경
+          body: Column(
             children: [
-              _buildBackground(backgroundHeight),
-              _buildAnimatedFish(
-                LevelService.getSafeLevel(currentLevel),
-                backgroundHeight,
+              // 1. 상단 비주얼 영역 (Stack으로 겹침 효과 유지)
+              Stack(
+                clipBehavior: Clip.none, // 시트가 위로 올라오도록 설정
+                children: [
+                  QuizLevelVisualizer(
+                    height: visualizerHeight,
+                    level: LevelService.getSafeLevel(currentLevel),
+                    floatAnimation: _floatController,
+                  ),
+                  // 시트의 둥근 모서리 부분이 비주얼 영역과 겹치도록 배치
+                  Positioned(
+                    bottom: -1,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 40,
+                      decoration: _sheetDecoration(),
+                    ),
+                  ),
+                ],
               ),
-              Positioned(
-                top: backgroundHeight - 40,
-                left: 0,
-                right: 0,
-                bottom: 0,
+
+              // 2. 하단 콘텐츠 영역 (나머지 공간 전체 차지)
+              Expanded(
                 child: Container(
-                  decoration: _sheetDecoration(),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(28, 30, 28, 30),
+                  color: AppColors.background,
+                  child: SingleChildScrollView(
+                    // 💡 화면이 작을 경우를 대비해 스크롤 추가
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(28, 0, 28, 30),
                     child: Column(
                       children: [
                         _buildSlimProfileHeader(userData, currentExp),
                         const SizedBox(height: 15),
-                        _buildSlimProgressBar(
-                          LevelService.getLevelProgress(currentExp),
-                        ),
-                        const Spacer(),
+                        _buildSlimProgressBar(currentExp),
+                        const SizedBox(height: 30),
                         _buildCategorySelector(),
-                        const Spacer(),
+                        const SizedBox(height: 30),
                         _buildQuizButton(currentExp),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 20),
                       ],
                     ),
                   ),
@@ -103,6 +120,8 @@ class _QuizHomeScreenState extends State<QuizHomeScreen>
     );
   }
 
+  // --- 내부 빌드 메서드 (동일) ---
+
   Widget _buildCategorySelector() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -112,7 +131,7 @@ class _QuizHomeScreenState extends State<QuizHomeScreen>
           style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF2D1B69),
+            color: AppColors.deepPurple,
           ),
         ),
         const SizedBox(height: 15),
@@ -126,27 +145,23 @@ class _QuizHomeScreenState extends State<QuizHomeScreen>
                 cat,
                 style: TextStyle(
                   color: isSelected ? Colors.white : Colors.black87,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
               selected: isSelected,
               onSelected: (selected) {
                 setState(() {
-                  if (selected) {
+                  if (selected)
                     _selectedCategories.add(cat);
-                  } else if (_selectedCategories.length > 1) {
+                  else if (_selectedCategories.length > 1)
                     _selectedCategories.remove(cat);
-                  }
                 });
               },
-              selectedColor: const Color(0xFF7B61FF),
+              selectedColor: AppColors.primaryPurple,
               checkmarkColor: Colors.white,
               backgroundColor: const Color(0xFFF2F4FF),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(25),
-                side: BorderSide(color: Colors.grey.shade100),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             );
           }).toList(),
         ),
@@ -154,40 +169,14 @@ class _QuizHomeScreenState extends State<QuizHomeScreen>
     );
   }
 
-  Widget _buildBackground(double h) => Positioned(
-    top: 0,
-    left: 0,
-    right: 0,
-    height: h,
-    child: Image.asset('assets/images/background.jpg', fit: BoxFit.fill),
-  );
-
-  Widget _buildAnimatedFish(int lvl, double h) => AnimatedBuilder(
-    animation: _floatController,
-    builder: (context, child) => Positioned(
-      top: (h * 0.18) + (_floatController.value * 15),
-      left: 0,
-      right: 0,
-      child: Center(
-        child: Image.asset('assets/images/fish_$lvl.png', width: 140),
-      ),
-    ),
-  );
-
   Widget _buildSlimProfileHeader(Map<String, dynamic> data, int exp) {
-    // 💡 에러의 원인 해결: URL이 null이거나 빈 문자열인지 확실히 체크
     String? profileUrl = data['profileUrl'];
-    bool hasValidUrl =
-        profileUrl != null &&
-        profileUrl.isNotEmpty &&
-        profileUrl.startsWith('http');
-
     return Row(
       children: [
         CircleAvatar(
           radius: 25,
           backgroundColor: const Color(0xFFF2F4FF),
-          backgroundImage: hasValidUrl
+          backgroundImage: (profileUrl != null && profileUrl.isNotEmpty)
               ? NetworkImage(profileUrl)
               : const AssetImage('assets/images/default_profile.png')
                     as ImageProvider,
@@ -199,67 +188,55 @@ class _QuizHomeScreenState extends State<QuizHomeScreen>
             children: [
               Text(
                 data['nickname'] ?? "익명",
-                style: const TextStyle(fontSize: 14, color: Colors.grey),
+                style: const TextStyle(fontSize: 14, color: AppColors.textGrey),
               ),
               Text(
                 LevelService.getLevelName(LevelService.getLevel(exp)),
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2D1B69),
+                  color: AppColors.deepPurple,
                 ),
               ),
             ],
           ),
         ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            const Text(
-              "LEVEL",
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF7B61FF),
-              ),
-            ),
-            Text(
-              "${LevelService.getLevel(exp)}",
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF7B61FF),
-              ),
-            ),
-          ],
+        Text(
+          "${LevelService.getLevel(exp)}",
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: AppColors.primaryPurple,
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildSlimProgressBar(double p) => Column(
-    children: [
-      ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: LinearProgressIndicator(
-          value: p,
-          minHeight: 10,
-          backgroundColor: const Color(0xFFF2F4FF),
-          color: const Color(0xFF7B61FF),
-        ),
-      ),
-      const SizedBox(height: 8),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Text(
-            "다음 레벨까지 ${((1 - p) * 100).toInt()}% 남음",
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
+  Widget _buildSlimProgressBar(int exp) {
+    double progress = LevelService.getLevelProgress(exp);
+    return Column(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: LinearProgressIndicator(
+            value: progress,
+            minHeight: 10,
+            backgroundColor: const Color(0xFFF2F4FF),
+            color: AppColors.primaryPurple,
           ),
-        ],
-      ),
-    ],
-  );
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Text(
+            "다음 레벨까지 ${LevelService.expUntilNextLevel(exp)} 점 남음",
+            style: const TextStyle(fontSize: 12, color: AppColors.textGrey),
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildQuizButton(int exp) => SizedBox(
     width: double.infinity,
@@ -275,10 +252,11 @@ class _QuizHomeScreenState extends State<QuizHomeScreen>
         ),
       ),
       style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF7B61FF),
+        backgroundColor: AppColors.primaryPurple,
         elevation: 8,
-        // 💡 [2026-02-22] 규칙 적용: withValues 사용
-        shadowColor: const Color(0xFF7B61FF).withValues(alpha: 0.4),
+        shadowColor: AppColors.primaryPurple.withValues(
+          alpha: 0.4,
+        ), // 💡 withValues 적용
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       child: const Text(
@@ -293,7 +271,7 @@ class _QuizHomeScreenState extends State<QuizHomeScreen>
   );
 
   BoxDecoration _sheetDecoration() => const BoxDecoration(
-    color: Colors.white,
+    color: AppColors.background,
     borderRadius: BorderRadius.only(
       topLeft: Radius.circular(40),
       topRight: Radius.circular(40),

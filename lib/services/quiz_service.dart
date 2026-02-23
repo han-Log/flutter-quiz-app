@@ -3,26 +3,54 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../models/quiz_model.dart';
+import '../services/level_service.dart'; // LevelService.maxLevel 참조를 위해 추가
 
 class QuizService {
   final _apiKey = dotenv.env['API_KEY'] ?? '';
 
-  Future<List<Quiz>> generateQuizzes(List<String> selectedCategories) async {
-    // 💡 gemini-1.5-flash 또는 gemini-2.0-flash-lite 등 최신 모델 권장
+  /// [userLevel] 파라미터를 추가하여 난이도를 동적으로 조절합니다.
+  Future<List<Quiz>> generateQuizzes(
+    List<String> selectedCategories,
+    int userLevel,
+  ) async {
+    // 💡 최신 모델 사용 (모델명은 프로젝트 설정에 맞춰 조정)
     final model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: _apiKey);
 
-    // AI가 딴소리 못하게 목록을 명확히 전달
     final String categoriesString = selectedCategories.join(", ");
+
+    // 💡 난이도 계산 로직: 최고 레벨 대비 현재 레벨의 비율을 계산
+    // 예: 만렙이 30인데 현재 3레벨이면 난이도는 '입문' 수준
+    final double difficultyRatio = userLevel / LevelService.maxLevel;
+    String difficultyDescription;
+
+    if (difficultyRatio <= 0.2) {
+      difficultyDescription = "아주 쉬움 (기초 상식, 초등학생 수준의 쉬운 단어 사용)";
+    } else if (difficultyRatio <= 0.4) {
+      difficultyDescription = "쉬움 (일반적인 상식 수준)";
+    } else if (difficultyRatio <= 0.7) {
+      difficultyDescription = "보통 (중고등학생 수준의 지식 필요)";
+    } else if (difficultyRatio <= 0.9) {
+      difficultyDescription = "어려움 (전문적인 지식이나 깊이 있는 사고 필요)";
+    } else {
+      difficultyDescription = "매우 어려움 (해당 분야의 전문가 수준, 까다로운 함정 문제 포함)";
+    }
 
     final prompt =
         """
       당신은 퀴즈 생성 전문가입니다.
       
+      [사용자 정보]
+      - 현재 레벨: $userLevel / ${LevelService.maxLevel}
+      - 권장 난이도: $difficultyDescription
+      
       [지시 사항]
       1. 반드시 아래의 카테고리 목록 중에서만 문제를 출제하세요:
          목록: [$categoriesString]
       
-      2. 위 목록에 없는 카테고리는 절대로 사용하지 마세요.
+      2. 사용자의 레벨에 맞춰 문제를 생성하세요. 
+         - 현재 사용자의 난이도는 '$difficultyDescription'입니다. 
+         - 레벨이 낮을수록 직관적이고 쉬운 문제를, 레벨이 높을수록 전문 용어가 섞인 복잡한 문제를 내주세요.
+      
       3. 문제는 총 3개를 생성하세요.
       4. 결과는 반드시 아래 JSON 형식을 따르며, 다른 설명은 생략하세요.
       
@@ -49,20 +77,17 @@ class QuizService {
 
       final List<dynamic> data = jsonDecode(responseText);
 
-      // 💡 [추가 보완] AI가 혹시라도 목록에 없는 카테고리를 냈을 경우를 대비해 코드에서 필터링
+      // 💡 카테고리 필터링 보완
       List<Quiz> filteredQuizzes = data
           .map((item) => Quiz.fromJson(Map<String, dynamic>.from(item)))
-          .where(
-            (quiz) => selectedCategories.contains(quiz.category),
-          ) // 👈 선택된 카테고리에 포함된 것만 통과
+          .where((quiz) => selectedCategories.contains(quiz.category))
           .toList();
 
-      // 만약 필터링 후 문제가 하나도 없다면, 선택된 것 중 하나로 강제 지정해서라도 반환 (안전장치)
       if (filteredQuizzes.isEmpty && data.isNotEmpty) {
         return data.map((item) {
           var quiz = Quiz.fromJson(Map<String, dynamic>.from(item));
           return Quiz(
-            category: selectedCategories[0], // 강제로 선택된 카테고리 중 첫 번째 주입
+            category: selectedCategories[0],
             question: quiz.question,
             options: quiz.options,
             answerIndex: quiz.answerIndex,
