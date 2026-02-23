@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:get/get.dart'; // 💡 GetX 임포트 추가
+import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart'; // 💡 구글 폰트 임포트 추가
 import 'firebase_options.dart';
 import 'screens/sign_screens/login_screen.dart';
 import 'screens/quiz_home_screen.dart';
@@ -29,7 +30,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 💡 MaterialApp 대신 GetMaterialApp을 사용해야 Get.bottomSheet 등이 작동합니다.
     return GetMaterialApp(
       title: 'AI Quiz App',
       debugShowCheckedModeBanner: false,
@@ -37,6 +37,10 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         useMaterial3: true,
         scaffoldBackgroundColor: Colors.white,
+
+        // 💡 앱 전체에 Noto Sans KR 폰트 테마 적용
+        // 이 설정을 통해 모든 Text 위젯의 기본 폰트가 Noto Sans로 바뀝니다.
+        textTheme: GoogleFonts.notoSansKrTextTheme(Theme.of(context).textTheme),
       ),
 
       // 1. 초기 화면 설정 (로그인 상태 감시)
@@ -57,7 +61,7 @@ class MyApp extends StatelessWidget {
         },
       ),
 
-      // 2. Named Routes 등록 (GetX 방식의 경로 관리도 지원하게 됩니다)
+      // 2. Named Routes 등록
       getPages: [
         GetPage(name: '/login', page: () => const LoginScreen()),
         GetPage(name: '/main', page: () => const MainScreen()),

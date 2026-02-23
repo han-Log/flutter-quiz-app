@@ -5,6 +5,7 @@ import '../services/database_service.dart';
 import '../widgets/attendance_grass_widget.dart';
 import '../widgets/score_radar_chart.dart';
 import 'following_list_screen.dart';
+import 'package:login/theme/app_colors.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -36,7 +37,7 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 255, 255, 255),
+      backgroundColor: AppColors.background,
       body: StreamBuilder<DocumentSnapshot>(
         stream: _dbService.userDataStream,
         builder: (context, snapshot) {
@@ -111,17 +112,14 @@ class _HomeScreenState extends State<HomeScreen>
                 const SizedBox(height: 35),
                 _buildSectionTitle("2026년 학습 리포트"),
                 const SizedBox(height: 12),
-
-                // 💡 [수정됨] 잔디 위젯을 흰색 배경과 그림자가 있는 Container로 감쌌습니다.
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Container(
-                    padding: const EdgeInsets.all(20), // 내부 여백
-                    decoration: _cardDecoration(), // 공통 그림자 스타일 적용
+                    padding: const EdgeInsets.all(20),
+                    decoration: _cardDecoration(),
                     child: AttendanceGrassWidget(attendance: attendance),
                   ),
                 ),
-
                 const SizedBox(height: 25),
                 _buildSectionTitle("영역별 역량 분석"),
                 const SizedBox(height: 12),
@@ -135,24 +133,20 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // --- 공통 카드 스타일 (그림자 포함) ---
   BoxDecoration _cardDecoration({Color? borderColor}) {
     return BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
+      color: AppColors.background,
+      borderRadius: AppDesign.cardRadius,
       border: borderColor != null ? Border.all(color: borderColor) : null,
       boxShadow: [
         BoxShadow(
-          // [2026-02-22] withValues 규칙 적용
-          color: const Color(0xFF2D1B69).withValues(alpha: 0.1),
+          color: AppColors.shadowColor,
           blurRadius: 15,
           offset: const Offset(0, 8),
         ),
       ],
     );
   }
-
-  // --- UI 구성 메서드 ---
 
   Widget _buildHeader(
     BuildContext context,
@@ -161,19 +155,35 @@ class _HomeScreenState extends State<HomeScreen>
     int following,
   ) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.only(
+        left: 40, // 왼쪽
+        top: 20, // 위
+        right: 30, // 오른쪽
+        bottom: 1, // 아래
+      ), //26
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start, // 💡 상단 정렬로 변경
         children: [
-          Row(
+          // 💡 제목과 서브타이틀을 세로로 배치
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(width: 5),
               const Text(
-                "나의 뇌 상태",
+                "현재 나의 상식 상태",
                 style: TextStyle(
                   fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2D1B69),
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.titleTextColor,
+                ),
+              ),
+              const SizedBox(height: 0.1), // 제목과 서브타이틀 사이 간격
+              const Text(
+                "현재 나의 상식 수준을 올려보세요",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.explainTextColor, // 흐린 색상 적용
                 ),
               ),
             ],
@@ -218,10 +228,13 @@ class _HomeScreenState extends State<HomeScreen>
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF7B61FF),
+              color: AppColors.primaryPurple,
             ),
           ),
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 12, color: AppColors.textGrey),
+          ),
         ],
       ),
     );
@@ -231,17 +244,17 @@ class _HomeScreenState extends State<HomeScreen>
     width: double.infinity,
     height: 260,
     decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(40),
+      borderRadius: BorderRadius.circular(50),
       boxShadow: [
         BoxShadow(
-          color: const Color(0xFF7B61FF).withValues(alpha: 0.2),
+          color: AppColors.shadowColor,
           blurRadius: 25,
           offset: const Offset(0, 12),
         ),
       ],
     ),
     child: ClipRRect(
-      borderRadius: BorderRadius.circular(40),
+      borderRadius: AppDesign.cardRadius,
       child: Image.asset('assets/images/background.jpg', fit: BoxFit.cover),
     ),
   );
@@ -269,15 +282,15 @@ class _HomeScreenState extends State<HomeScreen>
   );
 
   Widget _buildLevelBadge(int level, int score) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
     decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.9),
-      borderRadius: BorderRadius.circular(20),
+      color: const Color.fromARGB(7, 255, 255, 255).withValues(alpha: 0.9),
+      borderRadius: BorderRadius.circular(15),
     ),
     child: Text(
       "Lv.$level ${LevelService.getLevelName(level)} ($score pts)",
       style: const TextStyle(
-        color: Color(0xFF7B61FF),
+        color: AppColors.titleTextColor,
         fontSize: 13,
         fontWeight: FontWeight.bold,
       ),
@@ -290,14 +303,14 @@ class _HomeScreenState extends State<HomeScreen>
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         children: [
-          _buildStatBox("푼 문제", "$solved", Colors.blue),
+          _buildStatBox("푼 문제", "$solved", AppColors.infoBlue),
           const SizedBox(width: 10),
-          _buildStatBox("정답", "$correct", Colors.green),
+          _buildStatBox("정답", "$correct", AppColors.infoGreen),
           const SizedBox(width: 10),
           _buildStatBox(
             "정답률",
             "${accuracy.toStringAsFixed(1)}%",
-            Colors.orange,
+            AppColors.infoOrange,
           ),
         ],
       ),
@@ -307,7 +320,7 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildStatBox(String label, String value, Color color) => Expanded(
     child: Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: _cardDecoration(borderColor: color.withValues(alpha: 0.15)),
+      decoration: _cardDecoration(borderColor: color.withValues(alpha: 0.4)),
       child: Column(
         children: [
           Text(
@@ -319,7 +332,13 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ),
           const SizedBox(height: 2),
-          Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              color: AppColors.explainTextColor,
+            ),
+          ),
         ],
       ),
     ),
@@ -333,7 +352,7 @@ class _HomeScreenState extends State<HomeScreen>
         title,
         style: const TextStyle(
           fontWeight: FontWeight.bold,
-          color: Color(0xFF2D1B69),
+          color: AppColors.deepPurple,
           fontSize: 17,
         ),
       ),
