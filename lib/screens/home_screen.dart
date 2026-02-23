@@ -25,9 +25,6 @@ class _HomeScreenState extends State<HomeScreen>
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
-
-    // 💡 기존의 syncFollowCounts() 삭제!
-    // 이제 앱을 켤 때마다 DB 숫자를 덮어씌우지 않습니다.
   }
 
   @override
@@ -39,11 +36,10 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFBFBFF),
+      backgroundColor: const Color.fromARGB(255, 255, 255, 255),
       body: StreamBuilder<DocumentSnapshot>(
         stream: _dbService.userDataStream,
         builder: (context, snapshot) {
-          // 기본값 설정
           int level = 1;
           int score = 0;
           int followerCount = 0;
@@ -57,8 +53,6 @@ class _HomeScreenState extends State<HomeScreen>
           if (snapshot.hasData && snapshot.data?.data() != null) {
             var userData = snapshot.data!.data() as Map<String, dynamic>;
             myUid = userData['uid'] ?? "";
-
-            // 💡 DB에 저장된 숫자를 그대로 가져와서 보여줍니다.
             score = userData['score'] ?? 0;
             level = LevelService.getLevel(score);
             followerCount = userData['followerCount'] ?? 0;
@@ -114,11 +108,23 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 const SizedBox(height: 25),
                 _buildStatCards(totalSolved, totalCorrect),
-                const SizedBox(height: 25),
+                const SizedBox(height: 35),
                 _buildSectionTitle("2026년 학습 리포트"),
                 const SizedBox(height: 12),
-                AttendanceGrassWidget(attendance: attendance),
+
+                // 💡 [수정됨] 잔디 위젯을 흰색 배경과 그림자가 있는 Container로 감쌌습니다.
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Container(
+                    padding: const EdgeInsets.all(20), // 내부 여백
+                    decoration: _cardDecoration(), // 공통 그림자 스타일 적용
+                    child: AttendanceGrassWidget(attendance: attendance),
+                  ),
+                ),
+
                 const SizedBox(height: 25),
+                _buildSectionTitle("영역별 역량 분석"),
+                const SizedBox(height: 12),
                 _buildAnalysisSection(chartScores),
                 const SizedBox(height: 60),
               ],
@@ -126,6 +132,23 @@ class _HomeScreenState extends State<HomeScreen>
           );
         },
       ),
+    );
+  }
+
+  // --- 공통 카드 스타일 (그림자 포함) ---
+  BoxDecoration _cardDecoration({Color? borderColor}) {
+    return BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      border: borderColor != null ? Border.all(color: borderColor) : null,
+      boxShadow: [
+        BoxShadow(
+          // [2026-02-22] withValues 규칙 적용
+          color: const Color(0xFF2D1B69).withValues(alpha: 0.1),
+          blurRadius: 15,
+          offset: const Offset(0, 8),
+        ),
+      ],
     );
   }
 
@@ -142,13 +165,18 @@ class _HomeScreenState extends State<HomeScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
-            "나의 수족관",
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2D1B69),
-            ),
+          Row(
+            children: [
+              const SizedBox(width: 5),
+              const Text(
+                "나의 뇌 상태",
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2D1B69),
+                ),
+              ),
+            ],
           ),
           Row(
             children: [
@@ -183,24 +211,18 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         );
       },
-      child: Container(
-        color: Colors.transparent,
-        child: Column(
-          children: [
-            Text(
-              "$count",
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF7B61FF),
-              ),
+      child: Column(
+        children: [
+          Text(
+            "$count",
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF7B61FF),
             ),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          ],
-        ),
+          ),
+          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        ],
       ),
     );
   }
@@ -212,9 +234,9 @@ class _HomeScreenState extends State<HomeScreen>
       borderRadius: BorderRadius.circular(40),
       boxShadow: [
         BoxShadow(
-          color: const Color(0xFF7B61FF).withValues(alpha: 0.12),
-          blurRadius: 20,
-          offset: const Offset(0, 10),
+          color: const Color(0xFF7B61FF).withValues(alpha: 0.2),
+          blurRadius: 25,
+          offset: const Offset(0, 12),
         ),
       ],
     ),
@@ -232,38 +254,19 @@ class _HomeScreenState extends State<HomeScreen>
     ),
   );
 
-  Widget _buildAnalysisSection(List<double> scores) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 20,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "영역별 역량 분석",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              color: Color(0xFF2D1B69),
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(height: 220, child: ScoreRadarChart(scores: scores)),
-        ],
-      ),
-    );
-  }
+  Widget _buildAnalysisSection(List<double> scores) => Container(
+    width: double.infinity,
+    margin: const EdgeInsets.symmetric(horizontal: 24),
+    padding: const EdgeInsets.all(24),
+    decoration: _cardDecoration(),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 10),
+        SizedBox(height: 220, child: ScoreRadarChart(scores: scores)),
+      ],
+    ),
+  );
 
   Widget _buildLevelBadge(int level, int score) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -304,17 +307,18 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildStatBox(String label, String value, Color color) => Expanded(
     child: Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withValues(alpha: 0.15)),
-      ),
+      decoration: _cardDecoration(borderColor: color.withValues(alpha: 0.15)),
       child: Column(
         children: [
           Text(
             value,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
           ),
+          const SizedBox(height: 2),
           Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
         ],
       ),

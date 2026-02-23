@@ -14,12 +14,11 @@ class AttendanceGrassWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+      // 💡 외부 Container(HomeScreen)에서 이미 마진과 패딩을 주므로 내부 마진은 제거했습니다.
+      padding: const EdgeInsets.symmetric(vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FF),
+        color: Colors.white, // 👈 배경색을 흰색으로 변경
         borderRadius: BorderRadius.circular(25),
-        border: Border.all(color: const Color(0xFFE8E5FF)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -45,7 +44,7 @@ class AttendanceGrassWidget extends StatelessWidget {
     );
   }
 
-  // 💡 요일 라벨 (월, 수, 금 고정 위치)
+  // 💡 요일 라벨
   Widget _buildDayLabels() {
     final days = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
     return Column(
@@ -70,7 +69,7 @@ class AttendanceGrassWidget extends StatelessWidget {
     );
   }
 
-  // 💡 월 라벨 (Jan ~ Dec)
+  // 💡 월 라벨
   Widget _buildFixedMonthLabels() {
     final months = [
       'Jan',
@@ -105,10 +104,9 @@ class AttendanceGrassWidget extends StatelessWidget {
     );
   }
 
-  // 💡 잔디 컬럼 (요일 완벽 교정 로직 포함)
+  // 💡 잔디 컬럼
   Widget _buildFixedGrassColumns() {
     DateTime firstDayOfYear = DateTime(year, 1, 1);
-    // 깃허브 스타일: 첫 행은 항상 일요일. 1월 1일이 속한 주의 일요일을 시작점으로 잡음
     int adjustment = firstDayOfYear.weekday % 7;
     DateTime startDate = firstDayOfYear.subtract(Duration(days: adjustment));
 
@@ -134,7 +132,7 @@ class AttendanceGrassWidget extends StatelessWidget {
                 margin: const EdgeInsets.only(bottom: 3),
                 decoration: BoxDecoration(
                   color: (!isThisYear || isFuture)
-                      ? Colors.grey.withOpacity(0.05)
+                      ? Colors.grey.withValues(alpha: 0.05) // [2026-02-22] 적용
                       : _getGrassColor(count),
                   borderRadius: BorderRadius.circular(2),
                 ),
@@ -147,9 +145,10 @@ class AttendanceGrassWidget extends StatelessWidget {
   }
 
   Color _getGrassColor(int count) {
-    if (count <= 0) return Colors.grey.withOpacity(0.15);
-    if (count <= 3) return const Color(0xFF7B61FF).withOpacity(0.3);
-    if (count <= 8) return const Color(0xFF7B61FF).withOpacity(0.6);
+    // [2026-02-22] 모든 투명도 처리를 withValues(alpha: ...)로 변경
+    if (count <= 0) return Colors.grey.withValues(alpha: 0.15);
+    if (count <= 3) return const Color(0xFF7B61FF).withValues(alpha: 0.3);
+    if (count <= 8) return const Color(0xFF7B61FF).withValues(alpha: 0.6);
     return const Color(0xFF7B61FF);
   }
 }

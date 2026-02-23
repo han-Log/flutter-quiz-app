@@ -38,6 +38,7 @@ class DatabaseService {
   }
 
   // [2] rankingStream (비용 절감을 위해 Future로 내부 구현)
+  // 💡 팁: 이 부분이 Future이기 때문에 프로필 수정 후 이 함수를 다시 호출해야 화면이 갱신됩니다.
   Future<List<Map<String, dynamic>>> get rankingStream async {
     try {
       final snapshot = await _db
@@ -71,7 +72,7 @@ class DatabaseService {
     }
   }
 
-  // 💡 [4] 팔로우/언팔로우 (필드명 수정됨: followedAt)
+  // [4] 팔로우/언팔로우
   Future<void> toggleFollow(
     String myUid,
     String targetUid,
@@ -92,7 +93,6 @@ class DatabaseService {
         .doc(myUid);
 
     if (currentlyFollowing) {
-      // 언팔로우
       batch.delete(myFollowingDoc);
       batch.delete(targetFollowerDoc);
       batch.update(_db.collection('users').doc(myUid), {
@@ -102,11 +102,9 @@ class DatabaseService {
         'followerCount': FieldValue.increment(-1),
       });
     } else {
-      // 팔로우
-      // 💡 핵심: FollowingListScreen의 정렬 필드인 'followedAt'으로 이름을 맞춤
       batch.set(myFollowingDoc, {
         'followedAt': FieldValue.serverTimestamp(),
-        'uid': targetUid, // 리스트에서 ID 참조를 위해 추가
+        'uid': targetUid,
       });
       batch.set(targetFollowerDoc, {
         'followedAt': FieldValue.serverTimestamp(),
@@ -119,7 +117,6 @@ class DatabaseService {
         'followerCount': FieldValue.increment(1),
       });
     }
-
     await batch.commit();
   }
 
@@ -148,8 +145,6 @@ class DatabaseService {
           .map((doc) => doc.id)
           .toList();
       followingIds.add(uid!);
-
-      if (followingIds.isEmpty) return [];
 
       final rankingSnap = await _db
           .collection('users')
@@ -245,8 +240,32 @@ class DatabaseService {
     }
   }
 
-  // DatabaseService.dart에 추가
   Future<DocumentSnapshot> getUserData(String targetUid) async {
     return await _db.collection('users').doc(targetUid).get();
+  }
+
+  // 💡 수정된 부분: 유저 프로필 업데이트
+  Future<void> updateUserProfile({
+    required String uid,
+    String? nickname,
+    String? profileUrl,
+  }) async {
+    try {
+      final Map<String, dynamic> updates = {};
+      if (nickname != null) updates['nickname'] = nickname;
+      if (profileUrl != null) updates['profileUrl'] = profileUrl;
+
+      if (updates.isNotEmpty) {
+        // 1. users 컬렉션 업데이트 (랭킹 데이터의 원천)
+        await _db.collection('users').doc(uid).update(updates);
+        debugPrint("✅ Users 컬렉션 업데이트 완료: $updates");
+
+        // 💡 만약 다른 컬렉션(예: 랭킹 전용)을 따로 쓰지 않는다면
+        // 화면에서 이 Future가 끝난 후 setState()나 GetX 컨트롤러를 새로고침해야 합니다.
+      }
+    } catch (e) {
+      debugPrint("❌ 프로필 업데이트 실패: $e");
+      rethrow;
+    }
   }
 }

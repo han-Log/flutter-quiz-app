@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'quiz_screen.dart';
-import 'search_screen.dart';
 import '../services/level_service.dart';
 import '../services/database_service.dart';
 
@@ -71,7 +70,6 @@ class _QuizHomeScreenState extends State<QuizHomeScreen>
                 LevelService.getSafeLevel(currentLevel),
                 backgroundHeight,
               ),
-              _buildTopSearchButton(),
               Positioned(
                 top: backgroundHeight - 40,
                 left: 0,
@@ -172,21 +170,6 @@ class _QuizHomeScreenState extends State<QuizHomeScreen>
       right: 0,
       child: Center(
         child: Image.asset('assets/images/fish_$lvl.png', width: 140),
-      ),
-    ),
-  );
-
-  Widget _buildTopSearchButton() => Positioned(
-    top: 50,
-    right: 24,
-    child: CircleAvatar(
-      backgroundColor: Colors.black26,
-      child: IconButton(
-        icon: const Icon(Icons.person_add, color: Colors.white),
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const SearchScreen()),
-        ),
       ),
     ),
   );

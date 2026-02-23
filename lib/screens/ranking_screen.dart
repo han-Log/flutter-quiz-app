@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+// 💡 프로젝트 구조에 따라 RankingController 경로를 확인하세요.
 import '../controllers/ranking_controller.dart';
 import '../widgets/profile_detail_sheet.dart';
 
@@ -20,13 +21,10 @@ class _RankingScreenState extends State<RankingScreen> {
   @override
   void initState() {
     super.initState();
-    debugPrint("🚩 [1. initState] 시작");
     controller.fetchRankData();
 
-    // 데이터가 채워지면 스크롤 준비
     once(controller.allRankers, (List<Map<String, dynamic>> data) {
       if (data.isNotEmpty && mounted) {
-        debugPrint("🚩 [2. Worker] 데이터 수신 (${data.length}명)");
         _prepareScroll();
       }
     });
@@ -40,32 +38,29 @@ class _RankingScreenState extends State<RankingScreen> {
   }
 
   void _prepareScroll() async {
-    await Future.delayed(const Duration(milliseconds: 600)); // 리스트 빌드 대기
-    if (mounted) _executeScroll();
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (mounted) {
+      _executeScroll();
+    }
   }
 
   void _executeScroll() {
-    if (!mounted || _hasAutoScrolled || !_allScrollController.hasClients)
+    if (!mounted || _hasAutoScrolled || !_allScrollController.hasClients) {
       return;
+    }
 
     final allRankers = controller.allRankers;
     int myIndex = allRankers.indexWhere((u) => u['uid'] == widget.myUid);
 
-    debugPrint("🚩 [3. 실행] 내 인덱스: $myIndex");
-
     double targetOffset = 0;
-
     if (myIndex != -1) {
-      // 💡 케이스 1: 상위 랭킹(리스트 내부)에 내가 있을 때
       if (myIndex < 3) {
-        _hasAutoScrolled = true; // 포디움은 스크롤 안함
+        _hasAutoScrolled = true;
         return;
       }
       targetOffset =
           ((myIndex - 3) * 74.0) - (MediaQuery.of(context).size.height * 0.2);
     } else {
-      // 💡 케이스 2: [핵심 수정] 내가 상위 랭킹에 없을 때 -> 리스트 맨 아래로!
-      debugPrint("🚩 [4. 이동] 상위권에 없음. 리스트 맨 아래로 이동합니다.");
       targetOffset = _allScrollController.position.maxScrollExtent;
     }
 
@@ -76,9 +71,8 @@ class _RankingScreenState extends State<RankingScreen> {
         curve: Curves.easeInOutCubic,
       );
       _hasAutoScrolled = true;
-      debugPrint("✅ [완료] 스크롤 성공 (Offset: $targetOffset)");
     } catch (e) {
-      debugPrint("❌ [에러] 스크롤 실패: $e");
+      debugPrint("❌ 스크롤 오류: $e");
     }
   }
 
@@ -97,6 +91,7 @@ class _RankingScreenState extends State<RankingScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
+        // 💡 onPressed: _goToEditProfile와 IconButton을 제거했습니다.
       ),
       body: Obx(() {
         if (!controller.isInitialLoaded.value) {
@@ -152,9 +147,8 @@ class _RankingScreenState extends State<RankingScreen> {
     final podiumRankers = rankers.take(3).toList();
     final listRankers = rankers.skip(3).toList();
     int myTotalIndex = rankers.indexWhere((u) => u['uid'] == widget.myUid);
-
-    // 내가 리스트에 없을 때만 하단 "내 순위" 카드 표시
-    bool showSpecialBottomCard = isGlobal && (myTotalIndex == -1);
+    bool showSpecialBottomCard =
+        isGlobal && (myTotalIndex == -1 || myTotalIndex >= 10); // 10위 밖일 때 표시
 
     return Column(
       children: [
@@ -184,7 +178,6 @@ class _RankingScreenState extends State<RankingScreen> {
                         fontSize: 30,
                         color: Colors.grey,
                         letterSpacing: 8,
-                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
@@ -236,7 +229,14 @@ class _RankingScreenState extends State<RankingScreen> {
                     backgroundColor: isMe
                         ? const Color(0xFF7B61FF)
                         : Colors.grey[200],
-                    child: const Icon(Icons.person, color: Colors.grey),
+                    backgroundImage:
+                        (user['profileUrl'] != null && user['profileUrl'] != "")
+                        ? NetworkImage(user['profileUrl'])
+                        : null,
+                    child:
+                        (user['profileUrl'] == null || user['profileUrl'] == "")
+                        ? const Icon(Icons.person, color: Colors.grey)
+                        : null,
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -286,19 +286,20 @@ class _RankingScreenState extends State<RankingScreen> {
     bool isSpecial = false,
   }) {
     return GestureDetector(
+      // 💡 나이든 남이든 똑같이 프로필 정보 시트를 띄웁니다.
       onTap: () => _showProfile(user),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: isMe ? const Color(0xFFF2F4FF) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(30),
           border: isMe
               ? Border.all(color: const Color(0xFF7B61FF), width: 1.5)
               : null,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: Colors.black.withValues(alpha: 0.2),
               blurRadius: 10,
             ),
           ],
@@ -316,9 +317,15 @@ class _RankingScreenState extends State<RankingScreen> {
                 ),
               ),
             ),
-            const CircleAvatar(
+            CircleAvatar(
               radius: 22,
-              child: Icon(Icons.person, color: Colors.grey, size: 20),
+              backgroundImage:
+                  (user['profileUrl'] != null && user['profileUrl'] != "")
+                  ? NetworkImage(user['profileUrl'])
+                  : null,
+              child: (user['profileUrl'] == null || user['profileUrl'] == "")
+                  ? const Icon(Icons.person, color: Colors.grey, size: 20)
+                  : null,
             ),
             const SizedBox(width: 15),
             Expanded(

@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../services/level_service.dart';
-import '../services/database_service.dart'; // 💡 DatabaseService 추가
+import '../services/database_service.dart';
 import '../widgets/attendance_grass_widget.dart';
 import '../widgets/score_radar_chart.dart';
 
 class ProfileDetailSheet extends StatefulWidget {
   final Map<String, dynamic> userData;
-  final String myUid; // 💡 내 UID를 추가로 전달받음
+  final String myUid;
 
   const ProfileDetailSheet({
     super.key,
@@ -24,7 +24,7 @@ class _ProfileDetailSheetState extends State<ProfileDetailSheet>
   late AnimationController _floatController;
   final DatabaseService _dbService = DatabaseService();
   bool isFollowing = false;
-  bool isProcessing = false; // 💡 중복 클릭 방지용 로딩 상태
+  bool isProcessing = false;
 
   @override
   void initState() {
@@ -34,6 +34,7 @@ class _ProfileDetailSheetState extends State<ProfileDetailSheet>
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
 
+    // 초기 팔로우 상태 설정
     isFollowing = widget.userData['isFollowing'] ?? false;
   }
 
@@ -43,9 +44,8 @@ class _ProfileDetailSheetState extends State<ProfileDetailSheet>
     super.dispose();
   }
 
-  // 💡 Firebase 팔로우 토글 함수
   Future<void> _handleFollow() async {
-    if (isProcessing) return; // 처리 중이면 무시
+    if (isProcessing) return;
 
     setState(() => isProcessing = true);
 
@@ -57,8 +57,7 @@ class _ProfileDetailSheetState extends State<ProfileDetailSheet>
     }
 
     try {
-      // DatabaseService에 구현된 toggleFollow 호출
-      // 해당 메서드는 Firestore의 followers/following 컬렉션을 업데이트해야 합니다.
+      // 💡 Firebase Rules 수정 후에 이 부분이 정상 작동합니다.
       await _dbService.toggleFollow(widget.myUid, targetUid, isFollowing);
 
       setState(() {
@@ -75,7 +74,7 @@ class _ProfileDetailSheetState extends State<ProfileDetailSheet>
     } catch (e) {
       Get.snackbar("오류", "처리에 실패했습니다: $e");
     } finally {
-      setState(() => isProcessing = false);
+      if (mounted) setState(() => isProcessing = false);
     }
   }
 
@@ -142,7 +141,6 @@ class _ProfileDetailSheetState extends State<ProfileDetailSheet>
                   ),
                 ),
                 const SizedBox(height: 25),
-
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Row(
@@ -156,13 +154,11 @@ class _ProfileDetailSheetState extends State<ProfileDetailSheet>
                           color: Color(0xFF2D1B69),
                         ),
                       ),
-                      // 💡 내 프로필이 아닐 때만 팔로우 버튼 표시
                       if (widget.myUid != user['uid']) _buildFollowButton(),
                     ],
                   ),
                 ),
                 const SizedBox(height: 20),
-
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Stack(
@@ -177,10 +173,8 @@ class _ProfileDetailSheetState extends State<ProfileDetailSheet>
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 25),
                 _buildStatCards(totalSolved, totalCorrect),
-
                 const SizedBox(height: 25),
                 _buildSectionTitle("2026년 학습 리포트"),
                 const SizedBox(height: 12),
@@ -188,14 +182,12 @@ class _ProfileDetailSheetState extends State<ProfileDetailSheet>
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: AttendanceGrassWidget(attendance: attendance),
                 ),
-
                 const SizedBox(height: 25),
                 _buildAnalysisSection(chartScores),
                 const SizedBox(height: 100),
               ],
             ),
           ),
-
           Positioned(
             bottom: 20,
             left: 24,
