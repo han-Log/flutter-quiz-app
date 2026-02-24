@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import '../services/database_service.dart';
 
+// ranking 컨트롤러
 class RankingController extends GetxController {
   final DatabaseService _dbService = DatabaseService();
 

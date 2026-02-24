@@ -7,6 +7,7 @@ import 'ranking_screen.dart';
 import '../services/database_service.dart';
 import 'my_profile_screen.dart';
 
+// 제일 처음 실행되는 화면(네비게이션)
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 

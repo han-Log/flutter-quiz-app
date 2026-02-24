@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// 💡 성장에 따라 변화하는 배경과 캐릭터를 시각화하는 위젯
+///  성장에 따라 변화하는 배경과 캐릭터를 시각화하는 위젯
 class QuizLevelVisualizer extends StatelessWidget {
   final double height;
   final int level;

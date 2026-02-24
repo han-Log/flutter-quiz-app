@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/database_service.dart';
-import 'search_screen.dart';
+import '../widgets/profile_detail_sheet.dart';
 
+// 팔로우, 팔로잉 관련된 스크린
 class FollowingListScreen extends StatefulWidget {
   final String myUid;
   final String title;
@@ -22,9 +23,14 @@ class FollowingListScreen extends StatefulWidget {
 class _FollowingListScreenState extends State<FollowingListScreen> {
   final DatabaseService _dbService = DatabaseService();
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
 
+  // 리스트 관련 상태
   final List<DocumentSnapshot> _userDocs = [];
+  List<Map<String, dynamic>> _searchResults = [];
+
   bool _isLoading = false;
+  bool _isSearching = false; // 💡 현재 검색 모드인지 여부
   bool _hasMore = true;
   DocumentSnapshot? _lastDocument;
   final int _limit = 20;
@@ -40,60 +46,67 @@ class _FollowingListScreenState extends State<FollowingListScreen> {
     if (_scrollController.position.pixels >=
             _scrollController.position.maxScrollExtent * 0.9 &&
         !_isLoading &&
-        _hasMore) {
+        _hasMore &&
+        !_isSearching) {
       _fetchUsers();
     }
   }
 
-  // 💡 리스트 초기화 및 다시 불러오기 함수
-  Future<void> _refreshList() async {
-    setState(() {
-      _userDocs.clear();
-      _lastDocument = null;
-      _hasMore = true;
-    });
-    await _fetchUsers();
-  }
-
+  // 데이터 가져오기 (팔로우/팔로워)
   Future<void> _fetchUsers() async {
     if (_isLoading) return;
     setState(() => _isLoading = true);
-
     try {
       Query query = FirebaseFirestore.instance
           .collection('users')
           .doc(widget.myUid)
           .collection(widget.isFollowingMode ? 'following' : 'followers')
-          // 💡 DatabaseService에서 이 이름과 똑같은 필드('followedAt')를 저장해야 합니다.
           .orderBy('followedAt', descending: true)
           .limit(_limit);
 
-      if (_lastDocument != null) {
+      if (_lastDocument != null)
         query = query.startAfterDocument(_lastDocument!);
-      }
-
       final querySnapshot = await query.get();
 
-      if (querySnapshot.docs.length < _limit) {
-        _hasMore = false;
-      }
-
+      if (querySnapshot.docs.length < _limit) _hasMore = false;
       if (querySnapshot.docs.isNotEmpty) {
         _lastDocument = querySnapshot.docs.last;
-        setState(() {
-          _userDocs.addAll(querySnapshot.docs);
-        });
+        setState(() => _userDocs.addAll(querySnapshot.docs));
       }
     } catch (e) {
-      debugPrint("Error fetching users: $e");
+      debugPrint("Error: $e");
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  // 검색 실행
+  void _onSearch(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() {
+        _isSearching = false;
+        _searchResults = [];
+      });
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+      _isLoading = true;
+    });
+
+    final results = await _dbService.searchUsers(query);
+
+    setState(() {
+      _searchResults = results;
+      _isLoading = false;
+    });
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -112,148 +125,161 @@ class _FollowingListScreenState extends State<FollowingListScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
+        leading: _isSearching
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () {
+                  _searchController.clear();
+                  setState(() => _isSearching = false);
+                },
+              )
+            : null,
       ),
       body: Column(
         children: [
+          // 🔍 통합 검색창
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: GestureDetector(
-              onTap: () async {
-                // 💡 검색 화면으로 갔다가 돌아올 때(pop)를 기다립니다.
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const SearchScreen()),
-                );
-                // 💡 돌아오면 리스트를 새로고침합니다.
-                _refreshList();
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF2F4F7),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _isSearching
+                      ? const Color(0xFF7B61FF)
+                      : Colors.transparent,
                 ),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.search, color: Colors.grey.shade600),
-                    const SizedBox(width: 10),
-                    Text(
-                      "새로운 친구 찾기...",
-                      style: TextStyle(color: Colors.grey.shade600),
-                    ),
-                  ],
+              ),
+              child: TextField(
+                controller: _searchController,
+                onChanged: _onSearch, // 💡 타이핑할 때마다 검색
+                decoration: InputDecoration(
+                  hintText: "새로운 친구 찾기...",
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: Color(0xFF7B61FF),
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
                 ),
               ),
             ),
           ),
 
           Expanded(
-            child: _userDocs.isEmpty && !_isLoading
-                ? _buildEmptyState()
-                : ListView.builder(
-                    controller: _scrollController,
-                    itemCount: _userDocs.length + (_hasMore ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == _userDocs.length) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 20),
-                          child: Center(child: CircularProgressIndicator()),
-                        );
-                      }
-
-                      String targetUid = _userDocs[index].id;
-
-                      return FutureBuilder<DocumentSnapshot>(
-                        future: FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(targetUid)
-                            .get(),
-                        builder: (context, userSnapshot) {
-                          if (!userSnapshot.hasData)
-                            return const SizedBox.shrink();
-                          var userData =
-                              userSnapshot.data!.data()
-                                  as Map<String, dynamic>?;
-                          if (userData == null) return const SizedBox.shrink();
-
-                          return ListTile(
-                            leading: CircleAvatar(
-                              radius: 25,
-                              backgroundImage: userData['profileUrl'] != null
-                                  ? NetworkImage(userData['profileUrl'])
-                                  : const AssetImage(
-                                          'assets/images/default_profile.png',
-                                        )
-                                        as ImageProvider,
-                            ),
-                            title: Text(
-                              userData['nickname'] ?? "익명",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            subtitle: Text(
-                              "Lv.${(userData['score'] ?? 0) ~/ 100 + 1}",
-                            ),
-                            trailing: StreamBuilder<bool>(
-                              stream: _dbService.isFollowingStream(targetUid),
-                              builder: (context, followSnapshot) {
-                                bool isFollowing = followSnapshot.data ?? false;
-
-                                return SizedBox(
-                                  width: 90,
-                                  height: 32,
-                                  child: ElevatedButton(
-                                    onPressed: () async {
-                                      await _dbService.toggleFollow(
-                                        widget.myUid,
-                                        targetUid,
-                                        isFollowing,
-                                      );
-                                      // 팔로우 상태가 변하면 리스트에서 제거하거나 갱신해야 할 수 있음
-                                      if (widget.isFollowingMode &&
-                                          isFollowing) {
-                                        // 언팔로우 한 경우 리스트에서 즉시 제거 (선택 사항)
-                                        setState(() {
-                                          _userDocs.removeAt(index);
-                                        });
-                                      }
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: isFollowing
-                                          ? Colors.grey.shade200
-                                          : const Color(0xFF7B61FF),
-                                      foregroundColor: isFollowing
-                                          ? Colors.black87
-                                          : Colors.white,
-                                      elevation: 0,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      padding: EdgeInsets.zero,
-                                    ),
-                                    child: Text(
-                                      isFollowing ? "언팔로우" : "팔로우",
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
+            child: _isSearching
+                ? _buildSearchResultList() // 💡 검색 결과 화면
+                : _buildFollowList(), // 💡 기존 팔로우 리스트 화면
           ),
         ],
       ),
+    );
+  }
+
+  // 1. 기존 팔로우/팔로워 리스트 빌더
+  Widget _buildFollowList() {
+    if (_userDocs.isEmpty && !_isLoading) return _buildEmptyState();
+    return ListView.builder(
+      controller: _scrollController,
+      itemCount: _userDocs.length + (_hasMore ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == _userDocs.length)
+          return const Center(child: CircularProgressIndicator());
+        String targetUid = _userDocs[index].id;
+
+        return FutureBuilder<DocumentSnapshot>(
+          future: FirebaseFirestore.instance
+              .collection('users')
+              .doc(targetUid)
+              .get(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) return const SizedBox.shrink();
+            var userData = snapshot.data!.data() as Map<String, dynamic>?;
+            if (userData == null) return const SizedBox.shrink();
+            return _buildUserTile(userData, targetUid);
+          },
+        );
+      },
+    );
+  }
+
+  // 2. 검색 결과 리스트 빌더
+  Widget _buildSearchResultList() {
+    if (_isLoading)
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF7B61FF)),
+      );
+    if (_searchResults.isEmpty)
+      return const Center(child: Text("검색 결과가 없습니다."));
+
+    return ListView.builder(
+      itemCount: _searchResults.length,
+      itemBuilder: (context, index) {
+        final userData = _searchResults[index];
+        return _buildUserTile(userData, userData['uid']);
+      },
+    );
+  }
+
+  // 공통 유저 타일 위젯
+  Widget _buildUserTile(Map<String, dynamic> userData, String targetUid) {
+    return ListTile(
+      onTap: () => _openProfile(userData),
+      leading: CircleAvatar(
+        radius: 25,
+        backgroundImage:
+            userData['profileUrl'] != null && userData['profileUrl'] != ""
+            ? NetworkImage(userData['profileUrl'])
+            : const AssetImage('assets/images/default_profile.png')
+                  as ImageProvider,
+      ),
+      title: Text(
+        userData['nickname'] ?? "익명",
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
+      subtitle: Text("EXP ${userData['score'] ?? 0}"),
+      trailing: StreamBuilder<bool>(
+        stream: _dbService.isFollowingStream(targetUid),
+        builder: (context, snapshot) {
+          bool isFollowing = snapshot.data ?? false;
+          return _buildFollowButton(targetUid, isFollowing);
+        },
+      ),
+    );
+  }
+
+  Widget _buildFollowButton(String targetUid, bool isFollowing) {
+    return SizedBox(
+      width: 90,
+      height: 32,
+      child: ElevatedButton(
+        onPressed: () =>
+            _dbService.toggleFollow(widget.myUid, targetUid, isFollowing),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isFollowing
+              ? const Color(0xFFF2F4F7)
+              : const Color(0xFF7B61FF),
+          foregroundColor: isFollowing ? Colors.black87 : Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: EdgeInsets.zero,
+        ),
+        child: Text(
+          isFollowing ? "언팔로우" : "팔로우",
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+
+  void _openProfile(Map<String, dynamic> userData) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) =>
+          ProfileDetailSheet(userData: userData, myUid: widget.myUid),
     );
   }
 
@@ -265,7 +291,7 @@ class _FollowingListScreenState extends State<FollowingListScreen> {
           Icon(Icons.group_add_outlined, size: 80, color: Colors.grey.shade200),
           const SizedBox(height: 16),
           Text(
-            "아직 ${widget.title}가 없어요.\n새로운 친구를 찾아보세요!",
+            "아직 ${widget.title}가 없어요.\n친구를 검색해 보세요!",
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey.shade500, fontSize: 16),
           ),

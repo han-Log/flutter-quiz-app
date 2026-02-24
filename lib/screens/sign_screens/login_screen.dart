@@ -4,6 +4,7 @@ import '../../services/auth_service.dart';
 import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
 
+// login 관련 스크린
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 

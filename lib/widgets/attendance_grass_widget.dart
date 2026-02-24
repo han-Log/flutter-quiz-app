@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+// github 잔디 기능
 class AttendanceGrassWidget extends StatelessWidget {
   final Map<String, dynamic> attendance;
   final int year;

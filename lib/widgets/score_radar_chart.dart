@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+// 유저 분석 방사형 그래프 위젯
 class ScoreRadarChart extends StatelessWidget {
   final List<double> scores;
 

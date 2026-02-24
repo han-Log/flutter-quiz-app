@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-// 💡 프로젝트 구조에 따라 RankingController 경로를 확인하세요.
 import '../controllers/ranking_controller.dart';
 import '../widgets/profile_detail_sheet.dart';
 
+// 유저간 랭킹 화면
 class RankingScreen extends StatefulWidget {
   final String? myUid;
   const RankingScreen({super.key, required this.myUid});

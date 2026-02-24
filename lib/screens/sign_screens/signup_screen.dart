@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 
+// 회원가입 스크린
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
 

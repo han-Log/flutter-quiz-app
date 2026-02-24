@@ -6,6 +6,7 @@ import '../services/database_service.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
 
+// 내 프로필 정보를 바꾸는 설정 스크린
 class EditProfileScreen extends StatefulWidget {
   final String currentNickname;
   final String currentProfileUrl;

@@ -5,6 +5,7 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import '../models/quiz_model.dart';
 import '../services/level_service.dart'; // LevelService.maxLevel 참조를 위해 추가
 
+// quiz와 관련된 시스템
 class QuizService {
   final _apiKey = dotenv.env['API_KEY'] ?? '';
 
@@ -13,13 +14,11 @@ class QuizService {
     List<String> selectedCategories,
     int userLevel,
   ) async {
-    // 💡 최신 모델 사용 (모델명은 프로젝트 설정에 맞춰 조정)
     final model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: _apiKey);
 
     final String categoriesString = selectedCategories.join(", ");
 
-    // 💡 난이도 계산 로직: 최고 레벨 대비 현재 레벨의 비율을 계산
-    // 예: 만렙이 30인데 현재 3레벨이면 난이도는 '입문' 수준
+    // 난이도 자동 계산 로직: 최고 레벨 대비 현재 레벨의 비율을 계산
     final double difficultyRatio = userLevel / LevelService.maxLevel;
     String difficultyDescription;
 
@@ -77,7 +76,7 @@ class QuizService {
 
       final List<dynamic> data = jsonDecode(responseText);
 
-      // 💡 카테고리 필터링 보완
+      // 카테고리 필터링 보완
       List<Quiz> filteredQuizzes = data
           .map((item) => Quiz.fromJson(Map<String, dynamic>.from(item)))
           .where((quiz) => selectedCategories.contains(quiz.category))

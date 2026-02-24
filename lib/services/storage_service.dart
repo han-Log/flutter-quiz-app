@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 
+// Goole Storage 저장과 관련된 시스템
 class StorageService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
 

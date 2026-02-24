@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart'; // 💡 내 UID를 가져오�
 import '../services/database_service.dart';
 import '../widgets/profile_detail_sheet.dart';
 
+// 친구 찾기 화면
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
 
