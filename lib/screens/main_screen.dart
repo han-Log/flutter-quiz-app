@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:login/screens/home_screen.dart';
 import 'quiz_home_screen.dart';
-// 💡 기존 RankingSystem 대신 새롭게 정의한 RankingScreen을 임포트합니다.
 import 'ranking_screen.dart';
 import '../services/database_service.dart';
 import 'my_profile_screen.dart';
 
-// 제일 처음 실행되는 화면(네비게이션)
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -24,7 +22,6 @@ class _MainScreenState extends State<MainScreen> {
       case 0:
         return const HomeScreen();
       case 1:
-        // 🏆 랭킹 페이지 호출 (RankingScreen으로 변경)
         return RankingScreen(myUid: userData?['uid']);
       case 2:
         return const QuizHomeScreen();
@@ -36,9 +33,6 @@ class _MainScreenState extends State<MainScreen> {
         return const QuizHomeScreen();
     }
   }
-
-  // 💡 기존 _buildRankingPage는 RankingScreen 내부로 Scaffold가 이동했으므로
-  // 더 이상 여기서 중첩해서 감쌀 필요가 없어 삭제하거나 간소화할 수 있습니다.
 
   @override
   Widget build(BuildContext context) {
@@ -54,19 +48,20 @@ class _MainScreenState extends State<MainScreen> {
         }
 
         final userData = snapshot.data?.data() as Map<String, dynamic>?;
-        // UID가 데이터 안에 없을 경우를 대비해 추가
         if (userData != null && snapshot.data != null) {
           userData['uid'] = snapshot.data!.id;
         }
 
         return Scaffold(
+          // 💡 본문이 네비게이션 바 영역까지 확장되도록 설정 (투명 효과의 핵심)
+          extendBody: true,
           body: _getScreen(_selectedIndex, userData),
           bottomNavigationBar: Container(
+            // 💡 상단에 미세한 경계선을 주거나 그림자를 조절하여 가독성 확보
             decoration: BoxDecoration(
               boxShadow: [
                 BoxShadow(
-                  // 💡 요청하신 최신 문법 withValues 적용
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: Colors.black.withValues(alpha: 0.03),
                   blurRadius: 10,
                 ),
               ],
@@ -75,9 +70,11 @@ class _MainScreenState extends State<MainScreen> {
               currentIndex: _selectedIndex,
               onTap: (index) => setState(() => _selectedIndex = index),
               type: BottomNavigationBarType.fixed,
-              backgroundColor: Colors.white,
+              // 💡 배경색에 투명도 적용 (withValues 사용)
+              backgroundColor: Colors.white.withValues(alpha: 0.95),
+              elevation: 0, // 그림자를 Container에서 제어하므로 0으로 설정
               selectedItemColor: const Color(0xFF7B61FF),
-              unselectedItemColor: Colors.grey,
+              unselectedItemColor: Colors.grey.withValues(alpha: 0.8),
               selectedLabelStyle: const TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
