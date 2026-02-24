@@ -33,8 +33,6 @@ flutter:
   # 읽을 수 있는 설정
   assets:
     # Images
-    - assets/images/background.jpg
-    - assets/images/level_1.png
     - assets/images/
 
     # 제외시킬 파일

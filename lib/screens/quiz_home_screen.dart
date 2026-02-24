@@ -3,9 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'quiz_screen.dart';
 import '../services/level_service.dart';
 import '../services/database_service.dart';
-import 'package:login/theme/app_colors.dart';
+import 'package:login/theme/app_theme.dart';
 import '../widgets/quiz_level_visualizer.dart';
 
+// 퀴즈 시작전 화면
 class QuizHomeScreen extends StatefulWidget {
   const QuizHomeScreen({super.key});
 

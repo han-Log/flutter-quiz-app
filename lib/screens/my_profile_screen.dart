@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import 'edit_profile_screen.dart'; // 💡 새로 추가될 화면 임포트
 
+// 내 프로필과 설정과 관련된 스크린
 class MyProfileScreen extends StatelessWidget {
   final Map<String, dynamic> userData;
 

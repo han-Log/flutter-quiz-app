@@ -74,7 +74,12 @@ class _HomeScreenState extends State<HomeScreen>
     int following = data['followingCount'] ?? 0;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.only(
+        left: 30, // 왼쪽
+        top: 15, // 위
+        right: 24, // 오른쪽
+        bottom: 2, // 아래
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../services/database_service.dart';
 import '../widgets/user_info_view.dart'; // 💡 새로 만든 위젯 임포트
-import 'package:login/theme/app_colors.dart';
+import 'package:login/theme/app_theme.dart';
 
 // 유저를 클릭했을 때 나오는 프로필 정보
 class ProfileDetailSheet extends StatefulWidget {

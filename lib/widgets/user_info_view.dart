@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/level_service.dart';
-import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
 import '../widgets/attendance_grass_widget.dart';
 import '../widgets/score_radar_chart.dart';
 
@@ -48,6 +48,7 @@ class UserInfoView extends StatelessWidget {
       '과학',
       '일상',
     ];
+
     List<double> chartScores = categoryOrder
         .map((cat) {
           var stats = categories[cat];
@@ -59,13 +60,13 @@ class UserInfoView extends StatelessWidget {
 
     return Column(
       children: [
-        // 1. 수족관 배경 & 캐릭터
+        // 1. 수족관 배경 & 캐릭터 (💡 레벨별 배경 적용됨)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Stack(
             alignment: Alignment.center,
             children: [
-              _buildRoundedBackground(),
+              _buildRoundedBackground(level), // 레벨 전달
               _buildAnimatedFish(LevelService.getSafeLevel(level)),
               Positioned(bottom: 15, child: _buildLevelBadge(level, score)),
             ],
@@ -84,13 +85,13 @@ class UserInfoView extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Container(
             padding: const EdgeInsets.all(20),
-            decoration: _cardDecoration(),
+            decoration: AppDesign.cardDecoration(), // 💡 공통 디자인 적용
             child: AttendanceGrassWidget(attendance: attendance),
           ),
         ),
         const SizedBox(height: 25),
 
-        // 4. 역량 분석
+        // 4. 역량 분석 (칠각형 레이더 차트)
         _buildSectionTitle("영역별 역량 분석"),
         const SizedBox(height: 12),
         _buildAnalysisSection(chartScores),
@@ -152,7 +153,9 @@ class UserInfoView extends StatelessWidget {
   Widget _buildStatBox(String label, String value, Color color) => Expanded(
     child: Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: _cardDecoration(borderColor: color.withValues(alpha: 0.3)),
+      decoration: AppDesign.cardDecoration(
+        borderColor: color.withValues(alpha: 0.3),
+      ),
       child: Column(
         children: [
           Text(
@@ -180,7 +183,7 @@ class UserInfoView extends StatelessWidget {
     width: double.infinity,
     margin: const EdgeInsets.symmetric(horizontal: 24),
     padding: const EdgeInsets.all(20),
-    decoration: _cardDecoration(),
+    decoration: AppDesign.cardDecoration(),
     child: SizedBox(height: 220, child: ScoreRadarChart(scores: scores)),
   );
 
@@ -199,35 +202,34 @@ class UserInfoView extends StatelessWidget {
     ),
   );
 
-  BoxDecoration _cardDecoration({Color? borderColor}) => BoxDecoration(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(25),
-    border: borderColor != null ? Border.all(color: borderColor) : null,
-    boxShadow: [
-      BoxShadow(
-        color: AppColors.shadowColor,
-        blurRadius: 15,
-        offset: const Offset(0, 8),
-      ),
-    ],
-  );
+  // 💡 레벨에 따라 배경 이미지를 동적으로 로드함
+  Widget _buildRoundedBackground(int level) {
+    final String bgName = LevelService.getLevelBackground(level);
 
-  Widget _buildRoundedBackground() => Container(
-    width: double.infinity,
-    height: 240,
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(40),
-      boxShadow: [
-        BoxShadow(
-          color: AppColors.shadowColor,
-          blurRadius: 20,
-          offset: const Offset(0, 10),
+    return Container(
+      width: double.infinity,
+      height: 240,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(40),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowColor,
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(40),
+        child: Image.asset(
+          'assets/images/$bgName',
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => Image.asset(
+            'assets/images/sea.jpg',
+            fit: BoxFit.cover,
+          ), // 기본 배경 방어코드
         ),
-      ],
-    ),
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(40),
-      child: Image.asset('assets/images/background.jpg', fit: BoxFit.cover),
-    ),
-  );
+      ),
+    );
+  }
 }

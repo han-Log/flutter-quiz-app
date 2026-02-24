@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'database_service.dart';
 
+// login과 관련된 서비스
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 

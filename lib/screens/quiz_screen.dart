@@ -3,9 +3,10 @@ import '../models/quiz_model.dart';
 import '../services/quiz_service.dart';
 import '../services/database_service.dart';
 import '../services/level_service.dart';
-import 'package:login/theme/app_colors.dart';
+import 'package:login/theme/app_theme.dart';
 import '../widgets/quiz_level_visualizer.dart';
 
+// 퀴즈 시작 버튼 눌렀을 때 나오는 화면
 class QuizScreen extends StatefulWidget {
   final int initialExp;
   final List<String> selectedCategories;
@@ -164,11 +165,19 @@ class _QuizScreenState extends State<QuizScreen>
 
   void _finishQuiz() async {
     setState(() => _isLoading = true);
+
+    // 💡 해결책: '총 점수'를 보내는 게 아니라 '이번 퀴즈에서 얻은 점수'만 보내야 합니다.
+    // 또는 DatabaseService의 로직을 '더하기'가 아니라 '덮어쓰기'로 바꿔야 해요.
+
+    // 방법 1: 이번 세션에서 새로 얻은 점수만 계산해서 보내기
+    int gainedExp = _currentExp - widget.initialExp;
+
     await _dbService.updateQuizResults(
       _sessionCategoryStats,
-      _currentExp,
+      gainedExp, // 👈 '전체 점수'가 아닌 '늘어난 점수'만 전달!
       _correctCount,
     );
+
     if (!mounted) return;
     Navigator.pop(context, _currentExp);
   }

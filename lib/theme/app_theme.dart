@@ -24,7 +24,21 @@ class AppColors {
 class AppDesign {
   // 기본 카드 곡률
   static const double cardRadiusValue = 25.0;
-
-  // BorderRadius 객체 자체를 상수로 등록 (더 편리함)
   static final BorderRadius cardRadius = BorderRadius.circular(cardRadiusValue);
+
+  // 💡 이 메서드가 빠져있어서 에러가 났던 거예요!
+  static BoxDecoration cardDecoration({Color? borderColor}) {
+    return BoxDecoration(
+      color: Colors.white,
+      borderRadius: cardRadius,
+      border: borderColor != null ? Border.all(color: borderColor) : null,
+      boxShadow: [
+        BoxShadow(
+          color: AppColors.shadowColor,
+          blurRadius: 15,
+          offset: const Offset(0, 8),
+        ),
+      ],
+    );
+  }
 }
