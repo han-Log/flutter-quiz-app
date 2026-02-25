@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/database_service.dart';
 import '../widgets/profile_detail_sheet.dart';
 
-// 팔로우, 팔로잉 관련된 스크린
 class FollowingListScreen extends StatefulWidget {
   final String myUid;
   final String title;
@@ -25,15 +24,14 @@ class _FollowingListScreenState extends State<FollowingListScreen> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
 
-  // 리스트 관련 상태
-  final List<DocumentSnapshot> _userDocs = [];
+  final List<Map<String, dynamic>> _displayUsers = [];
   List<Map<String, dynamic>> _searchResults = [];
 
   bool _isLoading = false;
-  bool _isSearching = false; // 💡 현재 검색 모드인지 여부
+  bool _isSearching = false;
   bool _hasMore = true;
   DocumentSnapshot? _lastDocument;
-  final int _limit = 20;
+  final int _limit = 15;
 
   @override
   void initState() {
@@ -52,12 +50,12 @@ class _FollowingListScreenState extends State<FollowingListScreen> {
     }
   }
 
-  // 데이터 가져오기 (팔로우/팔로워)
   Future<void> _fetchUsers() async {
-    if (_isLoading) return;
+    if (_isLoading || !_hasMore) return;
     setState(() => _isLoading = true);
+
     try {
-      Query query = FirebaseFirestore.instance
+      Query subQuery = FirebaseFirestore.instance
           .collection('users')
           .doc(widget.myUid)
           .collection(widget.isFollowingMode ? 'following' : 'followers')
@@ -65,22 +63,44 @@ class _FollowingListScreenState extends State<FollowingListScreen> {
           .limit(_limit);
 
       if (_lastDocument != null)
-        query = query.startAfterDocument(_lastDocument!);
-      final querySnapshot = await query.get();
+        subQuery = subQuery.startAfterDocument(_lastDocument!);
+      final subSnapshot = await subQuery.get();
 
-      if (querySnapshot.docs.length < _limit) _hasMore = false;
-      if (querySnapshot.docs.isNotEmpty) {
-        _lastDocument = querySnapshot.docs.last;
-        setState(() => _userDocs.addAll(querySnapshot.docs));
+      if (subSnapshot.docs.length < _limit) _hasMore = false;
+      if (subSnapshot.docs.isEmpty) {
+        _hasMore = false;
+        if (mounted) setState(() => _isLoading = false);
+        return;
       }
+
+      _lastDocument = subSnapshot.docs.last;
+      List<String> uids = subSnapshot.docs.map((doc) => doc.id).toList();
+
+      final usersSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where(FieldPath.documentId, whereIn: uids)
+          .get();
+
+      Map<String, Map<String, dynamic>> userMap = {
+        for (var doc in usersSnapshot.docs)
+          doc.id: {...doc.data(), 'uid': doc.id},
+      };
+
+      List<Map<String, dynamic>> fetchedUsers = [];
+      for (String id in uids) {
+        if (userMap.containsKey(id)) fetchedUsers.add(userMap[id]!);
+      }
+
+      setState(() {
+        _displayUsers.addAll(fetchedUsers);
+      });
     } catch (e) {
-      debugPrint("Error: $e");
+      debugPrint("데이터 로드 에러: $e");
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // 검색 실행
   void _onSearch(String query) async {
     if (query.trim().isEmpty) {
       setState(() {
@@ -89,14 +109,11 @@ class _FollowingListScreenState extends State<FollowingListScreen> {
       });
       return;
     }
-
     setState(() {
       _isSearching = true;
       _isLoading = true;
     });
-
     final results = await _dbService.searchUsers(query);
-
     setState(() {
       _searchResults = results;
       _isLoading = false;
@@ -112,122 +129,96 @@ class _FollowingListScreenState extends State<FollowingListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: Text(
-          widget.title,
-          style: const TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
-        leading: _isSearching
-            ? IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () {
-                  _searchController.clear();
-                  setState(() => _isSearching = false);
-                },
-              )
-            : null,
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
       ),
-      body: Column(
+      child: Column(
         children: [
-          // 🔍 통합 검색창
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "${widget.title} 목록",
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
+            child: Container(
               decoration: BoxDecoration(
                 color: const Color(0xFFF2F4F7),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: _isSearching
-                      ? const Color(0xFF7B61FF)
-                      : Colors.transparent,
-                ),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: TextField(
                 controller: _searchController,
-                onChanged: _onSearch, // 💡 타이핑할 때마다 검색
-                decoration: InputDecoration(
-                  hintText: "새로운 친구 찾기...",
-                  prefixIcon: const Icon(
-                    Icons.search,
-                    color: Color(0xFF7B61FF),
-                  ),
+                onChanged: _onSearch,
+                decoration: const InputDecoration(
+                  hintText: "닉네임 검색",
+                  prefixIcon: Icon(Icons.search, color: Color(0xFF7B61FF)),
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                  contentPadding: EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
             ),
           ),
-
           Expanded(
             child: _isSearching
-                ? _buildSearchResultList() // 💡 검색 결과 화면
-                : _buildFollowList(), // 💡 기존 팔로우 리스트 화면
+                ? _buildList(_searchResults)
+                : _buildList(_displayUsers),
           ),
         ],
       ),
     );
   }
 
-  // 1. 기존 팔로우/팔로워 리스트 빌더
-  Widget _buildFollowList() {
-    if (_userDocs.isEmpty && !_isLoading) return _buildEmptyState();
-    return ListView.builder(
-      controller: _scrollController,
-      itemCount: _userDocs.length + (_hasMore ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index == _userDocs.length)
-          return const Center(child: CircularProgressIndicator());
-        String targetUid = _userDocs[index].id;
+  Widget _buildList(List<Map<String, dynamic>> users) {
+    if (users.isEmpty && !_isLoading) return _buildEmptyState();
 
-        return FutureBuilder<DocumentSnapshot>(
-          future: FirebaseFirestore.instance
-              .collection('users')
-              .doc(targetUid)
-              .get(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) return const SizedBox.shrink();
-            var userData = snapshot.data!.data() as Map<String, dynamic>?;
-            if (userData == null) return const SizedBox.shrink();
-            return _buildUserTile(userData, targetUid);
-          },
-        );
+    return ListView.builder(
+      controller: _isSearching ? null : _scrollController,
+      physics: const BouncingScrollPhysics(),
+      itemCount: users.length + (_hasMore && !_isSearching ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == users.length) {
+          return const Padding(
+            padding: EdgeInsets.all(20),
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          );
+        }
+        return _buildUserTile(users[index]);
       },
     );
   }
 
-  // 2. 검색 결과 리스트 빌더
-  Widget _buildSearchResultList() {
-    if (_isLoading)
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF7B61FF)),
-      );
-    if (_searchResults.isEmpty)
-      return const Center(child: Text("검색 결과가 없습니다."));
-
-    return ListView.builder(
-      itemCount: _searchResults.length,
-      itemBuilder: (context, index) {
-        final userData = _searchResults[index];
-        return _buildUserTile(userData, userData['uid']);
-      },
-    );
-  }
-
-  // 공통 유저 타일 위젯
-  Widget _buildUserTile(Map<String, dynamic> userData, String targetUid) {
+  Widget _buildUserTile(Map<String, dynamic> userData) {
+    String targetUid = userData['uid'] ?? "";
     return ListTile(
       onTap: () => _openProfile(userData),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
       leading: CircleAvatar(
-        radius: 25,
+        radius: 24,
         backgroundImage:
             userData['profileUrl'] != null && userData['profileUrl'] != ""
             ? NetworkImage(userData['profileUrl'])
@@ -238,11 +229,15 @@ class _FollowingListScreenState extends State<FollowingListScreen> {
         userData['nickname'] ?? "익명",
         style: const TextStyle(fontWeight: FontWeight.bold),
       ),
-      subtitle: Text("EXP ${userData['score'] ?? 0}"),
+      subtitle: Text("Level. ${((userData['score'] ?? 0) / 100).floor() + 1}"),
       trailing: StreamBuilder<bool>(
         stream: _dbService.isFollowingStream(targetUid),
+        // 💡 [핵심 수정] 팔로잉 탭에서 들어왔다면 초기값을 true(언팔로우 버튼)로 설정합니다!
+        initialData: widget.isFollowingMode ? true : false,
         builder: (context, snapshot) {
-          bool isFollowing = snapshot.data ?? false;
+          // 데이터가 로딩 중일 때는 initialData를 사용하므로 번쩍거림이 사라집니다.
+          bool isFollowing =
+              snapshot.data ?? (widget.isFollowingMode ? true : false);
           return _buildFollowButton(targetUid, isFollowing);
         },
       ),
@@ -250,24 +245,31 @@ class _FollowingListScreenState extends State<FollowingListScreen> {
   }
 
   Widget _buildFollowButton(String targetUid, bool isFollowing) {
-    return SizedBox(
-      width: 90,
-      height: 32,
-      child: ElevatedButton(
-        onPressed: () =>
-            _dbService.toggleFollow(widget.myUid, targetUid, isFollowing),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isFollowing
+    if (targetUid == widget.myUid) return const SizedBox.shrink();
+
+    return GestureDetector(
+      onTap: () =>
+          _dbService.toggleFollow(widget.myUid, targetUid, isFollowing),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        width: 85,
+        height: 32,
+        decoration: BoxDecoration(
+          color: isFollowing
               ? const Color(0xFFF2F4F7)
               : const Color(0xFF7B61FF),
-          foregroundColor: isFollowing ? Colors.black87 : Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          padding: EdgeInsets.zero,
+          borderRadius: BorderRadius.circular(8),
         ),
-        child: Text(
-          isFollowing ? "언팔로우" : "팔로우",
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+        child: Center(
+          child: AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 200),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: isFollowing ? Colors.black87 : Colors.white,
+            ),
+            child: Text(isFollowing ? "언팔로우" : "팔로우"),
+          ),
         ),
       ),
     );
@@ -288,13 +290,9 @@ class _FollowingListScreenState extends State<FollowingListScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.group_add_outlined, size: 80, color: Colors.grey.shade200),
-          const SizedBox(height: 16),
-          Text(
-            "아직 ${widget.title}가 없어요.\n친구를 검색해 보세요!",
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 16),
-          ),
+          Icon(Icons.person_outline, size: 60, color: Colors.grey[200]),
+          const SizedBox(height: 10),
+          Text("목록이 비어있습니다.", style: TextStyle(color: Colors.grey[400])),
         ],
       ),
     );

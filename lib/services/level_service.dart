@@ -2,8 +2,8 @@ class LevelService {
   static const int maxLevel = 10;
 
   static const Map<int, Map<String, dynamic>> _levelConfig = {
-    1: {"name": "금붕어", "minExp": 0, "nextExp": 10, "background": "sea.jpg"},
-    2: {"name": "해파리", "minExp": 10, "nextExp": 30, "background": "sea.jpg"},
+    1: {"name": "금붕어", "minExp": 0, "nextExp": 10, "background": "sea.jpeg"},
+    2: {"name": "해파리", "minExp": 10, "nextExp": 30, "background": "sea.jpeg"},
     3: {"name": "뱀", "minExp": 30, "nextExp": 40, "background": "forest.jpeg"},
     4: {"name": "개구리", "minExp": 40, "nextExp": 50, "background": "pond.jpeg"},
     5: {

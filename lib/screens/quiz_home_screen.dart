@@ -261,7 +261,7 @@ class _QuizHomeScreenState extends State<QuizHomeScreen>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       child: const Text(
-        "퀴즈 여행 시작 🚀",
+        "퀴즈 풀기",
         style: TextStyle(
           color: Colors.white,
           fontSize: 18,

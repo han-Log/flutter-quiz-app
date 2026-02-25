@@ -3,52 +3,50 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../models/quiz_model.dart';
-import '../services/level_service.dart'; // LevelService.maxLevel 참조를 위해 추가
+import '../services/level_service.dart';
 
-// quiz와 관련된 시스템
 class QuizService {
   final _apiKey = dotenv.env['API_KEY'] ?? '';
 
-  /// [userLevel] 파라미터를 추가하여 난이도를 동적으로 조절합니다.
   Future<List<Quiz>> generateQuizzes(
     List<String> selectedCategories,
     int userLevel,
   ) async {
+    // 모델명은 최신 버전인 'gemini-1.5-flash' 혹은 사용 가능한 모델로 확인해 주세요.
     final model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: _apiKey);
 
     final String categoriesString = selectedCategories.join(", ");
 
-    // 난이도 자동 계산 로직: 최고 레벨 대비 현재 레벨의 비율을 계산
+    // 💡 난이도 로직 상향 조정
     final double difficultyRatio = userLevel / LevelService.maxLevel;
     String difficultyDescription;
 
-    if (difficultyRatio <= 0.2) {
-      difficultyDescription = "아주 쉬움 (기초 상식, 초등학생 수준의 쉬운 단어 사용)";
-    } else if (difficultyRatio <= 0.4) {
-      difficultyDescription = "쉬움 (일반적인 상식 수준)";
-    } else if (difficultyRatio <= 0.7) {
-      difficultyDescription = "보통 (중고등학생 수준의 지식 필요)";
-    } else if (difficultyRatio <= 0.9) {
-      difficultyDescription = "어려움 (전문적인 지식이나 깊이 있는 사고 필요)";
+    // 0~30% 구간을 바로 '중학교 수준'으로 설정하여 초기 난이도를 올림
+    if (difficultyRatio <= 0.3) {
+      difficultyDescription = "보통 (중학생 수준의 교양 및 지식 필요, 단순 상식 이상의 문제)";
+    } else if (difficultyRatio <= 0.6) {
+      difficultyDescription = "어려움 (고등학교 수준 및 일반 성인 상식, 깊이 있는 지식 필요)";
+    } else if (difficultyRatio <= 0.8) {
+      difficultyDescription = "매우 어려움 (전문 분야 지식 포함, 까다로운 논리 문제)";
     } else {
-      difficultyDescription = "매우 어려움 (해당 분야의 전문가 수준, 까다로운 함정 문제 포함)";
+      difficultyDescription = "최상 (전문가 수준, 박사급 상식, 고난도의 함정 문제)";
     }
 
     final prompt =
         """
-      당신은 퀴즈 생성 전문가입니다.
+      당신은 퀴즈 생성 전문가입니다. 사용자의 지적 수준을 고려하여 도전적인 문제를 생성하세요.
       
       [사용자 정보]
       - 현재 레벨: $userLevel / ${LevelService.maxLevel}
       - 권장 난이도: $difficultyDescription
       
       [지시 사항]
-      1. 반드시 아래의 카테고리 목록 중에서만 문제를 출제하세요:
-         목록: [$categoriesString]
+      1. 반드시 다음 카테고리 내에서만 출제하세요: [$categoriesString]
       
-      2. 사용자의 레벨에 맞춰 문제를 생성하세요. 
-         - 현재 사용자의 난이도는 '$difficultyDescription'입니다. 
-         - 레벨이 낮을수록 직관적이고 쉬운 문제를, 레벨이 높을수록 전문 용어가 섞인 복잡한 문제를 내주세요.
+      2. **중요: 난이도 하한선 설정**
+         - 사용자의 레벨이 낮더라도 최소한 '중학교 수준'의 지식이 필요한 문제를 출제하세요.
+         - 초등학생 수준이나 너무 당연한 기초 상식(예: 사과는 빨갛다 등)은 절대 금지입니다.
+         - 레벨이 올라감에 따라 학술적 용어나 복잡한 인과관계가 포함된 문제를 출제하세요.
       
       3. 문제는 총 3개를 생성하세요.
       4. 결과는 반드시 아래 JSON 형식을 따르며, 다른 설명은 생략하세요.
@@ -76,7 +74,6 @@ class QuizService {
 
       final List<dynamic> data = jsonDecode(responseText);
 
-      // 카테고리 필터링 보완
       List<Quiz> filteredQuizzes = data
           .map((item) => Quiz.fromJson(Map<String, dynamic>.from(item)))
           .where((quiz) => selectedCategories.contains(quiz.category))

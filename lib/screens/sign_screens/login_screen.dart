@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/auth_service.dart';
+import '../../theme/app_theme.dart'; // 💡 AppColors 사용을 위해 임포트
 import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
 
-// login 관련 스크린
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -25,22 +25,18 @@ class _LoginScreenState extends State<LoginScreen> {
         content: Text(msg),
         backgroundColor: isError ? Colors.redAccent : Colors.green,
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
 
-  // 💡 로그인 통합 로직 수정
   Future<void> _handleLogin(Future<String?> loginMethod) async {
     setState(() => _isLoading = true);
-
     final String? errorMsg = await loginMethod;
-
     if (!mounted) return;
     setState(() => _isLoading = false);
 
     if (errorMsg == null) {
-      // ✅ 수정된 부분: '/home'이 아니라 '/main'으로 이동해야 합니다.
-      // 이렇게 해야 BottomNavigationBar가 있는 MainScreen이 뜹니다.
       if (FirebaseAuth.instance.currentUser != null) {
         Navigator.pushReplacementNamed(context, '/main');
       }
@@ -53,62 +49,90 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      // 💡 상단 뒤로가기 버튼을 위해 AppBar 추가 (WelcomeScreen으로 돌아가기)
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: AppColors.deepPurple,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 32.0),
+          padding: const EdgeInsets.symmetric(horizontal: 30),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 80),
+              // 1. 상단 캐릭터 로고 (WelcomeScreen과의 일관성)
+              Image.asset(
+                'assets/images/Wellcome_charactor.png',
+                width: 120,
+                height: 120,
+              ),
+              const SizedBox(height: 10),
               const Text(
-                "로그인",
+                "반가워요!",
                 style: TextStyle(
-                  color: Color(0xFF101828),
+                  color: AppColors.deepPurple,
                   fontSize: 28,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -1.0,
                 ),
               ),
               const SizedBox(height: 8),
               const Text(
-                "내 계정에 로그인 하세요.",
-                style: TextStyle(color: Color(0xFF475467), fontSize: 14),
+                "이메일로 간편하게 로그인하세요",
+                style: TextStyle(
+                  color: AppColors.explainTextColor,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 40),
 
-              _buildLabel("Email"),
+              // 2. 입력 필드 영역
+              _buildLabel("Email Address"),
               _buildTextField(
                 controller: _emailController,
-                hint: "My Email",
-                icon: Icons.mail_outline,
+                hint: "이메일을 입력해주세요",
+                icon: Icons.alternate_email_rounded,
               ),
               const SizedBox(height: 20),
 
               _buildLabel("Password"),
               _buildTextField(
                 controller: _passwordController,
-                hint: "My Password",
-                icon: Icons.lock_outline,
+                hint: "비밀번호를 입력해주세요",
+                icon: Icons.lock_outline_rounded,
                 isPassword: true,
               ),
 
-              const SizedBox(height: 12),
-
+              // 3. 부가 옵션 (자동로그인 / 비번찾기)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
                     children: [
-                      SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: Checkbox(
-                          value: _rememberMe,
-                          onChanged: (val) =>
-                              setState(() => _rememberMe = val!),
-                          activeColor: const Color(0xFF7B61FF),
+                      Checkbox(
+                        value: _rememberMe,
+                        onChanged: (val) => setState(() => _rememberMe = val!),
+                        activeColor: AppColors.primaryPurple,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      const Text("Remember Me", style: TextStyle(fontSize: 14)),
+                      const Text(
+                        "로그인 유지",
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.deepPurple,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ],
                   ),
                   TextButton(
@@ -121,10 +145,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       );
                     },
                     child: const Text(
-                      "Forgot Password",
+                      "비밀번호 찾기",
                       style: TextStyle(
-                        color: Color(0xFF7B61FF),
-                        fontWeight: FontWeight.w600,
+                        color: AppColors.primaryPurple,
+                        fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
                     ),
@@ -133,106 +157,68 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 32),
 
-              // 1. 이메일 로그인 버튼
-              Container(
-                width: double.infinity,
-                height: 56,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: LinearGradient(
-                    colors: _isLoading
-                        ? [Colors.grey, Colors.grey]
-                        : [const Color(0xFF8A72FF), const Color(0xFF7B61FF)],
-                  ),
-                ),
-                child: ElevatedButton(
-                  onPressed: _isLoading
-                      ? null
-                      : () => _handleLogin(
-                          _authService.loginWithEmail(
-                            _emailController.text.trim(),
-                            _passwordController.text.trim(),
-                          ),
+              // 4. 로그인 버튼
+              GestureDetector(
+                onTap: _isLoading
+                    ? null
+                    : () => _handleLogin(
+                        _authService.loginWithEmail(
+                          _emailController.text.trim(),
+                          _passwordController.text.trim(),
                         ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      ),
+                child: Container(
+                  width: double.infinity,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    gradient: LinearGradient(
+                      colors: _isLoading
+                          ? [Colors.grey.shade300, Colors.grey.shade400]
+                          : [const Color(0xFF8A72FF), AppColors.primaryPurple],
                     ),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
+                    boxShadow: [
+                      if (!_isLoading)
+                        BoxShadow(
+                          color: AppColors.primaryPurple.withValues(
+                            alpha: 0.25,
                           ),
-                        )
-                      : const Text(
-                          "로그인",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          blurRadius: 15,
+                          offset: const Offset(0, 6),
                         ),
-                ),
-              ),
-
-              const SizedBox(height: 40),
-              const Row(
-                children: [
-                  Expanded(child: Divider()),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      "OR",
-                      style: TextStyle(color: Color(0xFF98A2B3)),
-                    ),
+                    ],
                   ),
-                  Expanded(child: Divider()),
-                ],
-              ),
-              const SizedBox(height: 40),
-
-              // 2. 구글 로그인 버튼
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: OutlinedButton.icon(
-                  onPressed: _isLoading
-                      ? null
-                      : () => _handleLogin(_authService.signInWithGoogle()),
-                  icon: const Icon(
-                    Icons.g_mobiledata,
-                    size: 30,
-                    color: Color(0xFF101828),
-                  ),
-                  label: const Text(
-                    "Google로 로그인",
-                    style: TextStyle(
-                      color: Color(0xFF101828),
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFD0D5DD)),
-                    shape: const StadiumBorder(),
+                  child: Center(
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            "로그인하기",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
                 ),
               ),
 
               const SizedBox(height: 32),
 
+              // 5. 회원가입 유도
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text(
-                    "Don't have an account? ",
-                    style: TextStyle(color: Color(0xFF475467)),
+                    "아직 회원이 아니신가요? ",
+                    style: TextStyle(color: AppColors.explainTextColor),
                   ),
                   GestureDetector(
                     onTap: () {
@@ -244,16 +230,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       );
                     },
                     child: const Text(
-                      "Sign Up Here",
+                      "회원가입",
                       style: TextStyle(
-                        color: Color(0xFF7B61FF),
+                        color: AppColors.primaryPurple,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 40),
             ],
           ),
         ),
@@ -261,16 +247,17 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // 💡 라벨 위젯 커스텀
   Widget _buildLabel(String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
+      padding: const EdgeInsets.only(left: 4, bottom: 8.0),
       child: Align(
         alignment: Alignment.centerLeft,
         child: Text(
           text,
           style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF344054),
+            fontWeight: FontWeight.bold,
+            color: AppColors.deepPurple,
             fontSize: 14,
           ),
         ),
@@ -278,6 +265,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // 💡 입력창 위젯 커스텀 (HomeScreen의 카드 스타일 적용)
   Widget _buildTextField({
     required TextEditingController controller,
     required String hint,
@@ -286,18 +274,23 @@ class _LoginScreenState extends State<LoginScreen> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD0D5DD)),
+        color: const Color(0xFFF9FAFB), // 웰컴스크린 가이드 카드와 같은 배경색
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEAECF0)),
       ),
       child: TextField(
         controller: controller,
         obscureText: isPassword,
+        style: const TextStyle(
+          color: AppColors.deepPurple,
+          fontWeight: FontWeight.w500,
+        ),
         decoration: InputDecoration(
           hintText: hint,
-          prefixIcon: Icon(icon, color: const Color(0xFF7B61FF)),
+          hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+          prefixIcon: Icon(icon, color: AppColors.primaryPurple, size: 22),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(vertical: 18),
         ),
       ),
     );

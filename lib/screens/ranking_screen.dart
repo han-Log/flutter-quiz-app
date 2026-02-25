@@ -134,14 +134,51 @@ class _RankingScreenState extends State<RankingScreen> {
     bool showSpecialBottomCard =
         isGlobal && (myTotalIndex == -1 || myTotalIndex >= 10);
 
+    String topRankerBg = "sea.jpeg";
+    if (podiumRankers.isNotEmpty) {
+      int topScore = (podiumRankers[0]['score'] is num)
+          ? (podiumRankers[0]['score'] as num).toInt()
+          : 0;
+      int topLevel = LevelService.getLevel(topScore);
+      topRankerBg = LevelService.getLevelBackground(topLevel);
+    }
+
     return Column(
       children: [
-        _buildPodium(podiumRankers),
+        Container(
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage("assets/images/$topRankerBg"),
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
+            ),
+          ),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.white.withValues(alpha: 0.1),
+                        Colors.white,
+                      ],
+                      stops: const [0.5, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+              _buildPodium(podiumRankers),
+            ],
+          ),
+        ),
         Expanded(
           child: ListView.builder(
             controller: scrollController,
             key: PageStorageKey(isGlobal ? 'all' : 'friend'),
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 80),
+            padding: const EdgeInsets.fromLTRB(40, 20, 40, 80),
             itemCount: listRankers.length + (showSpecialBottomCard ? 2 : 0),
             itemBuilder: (context, index) {
               if (index < listRankers.length) {
@@ -187,9 +224,8 @@ class _RankingScreenState extends State<RankingScreen> {
     );
   }
 
-  // 🏆 수정된 시상대 위젯
+  // 🏆 수정된 시상대 위젯 (Transform.translate 적용)
   Widget _buildPodium(List<Map<String, dynamic>> top3) {
-    // 2위, 1위, 3위 순서로 배치
     final displayOrder = [
       if (top3.length > 1) top3[1] else null,
       if (top3.isNotEmpty) top3[0] else null,
@@ -197,11 +233,11 @@ class _RankingScreenState extends State<RankingScreen> {
     ];
 
     return Container(
-      height: 220, // 시상대 전체 높이 고정
+      height: 230,
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        crossAxisAlignment: CrossAxisAlignment.end, // 바닥에 붙이기
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: displayOrder.asMap().entries.map((entry) {
           final user = entry.value;
           if (user == null) return const Expanded(child: SizedBox());
@@ -209,8 +245,11 @@ class _RankingScreenState extends State<RankingScreen> {
           int rank = entry.key == 0 ? 2 : (entry.key == 1 ? 1 : 3);
           bool isMe = user['uid'] == widget.myUid;
 
-          // 순위별 막대 높이 설정
           double barHeight = rank == 1 ? 100 : (rank == 2 ? 70 : 50);
+          double avatarRadius = rank == 1 ? 12 : 10;
+
+          // 💡 1위는 캐릭터가 크니까 조금 더 많이(12) 내리고, 나머지는 살짝(8) 내립니다.
+          double pushDownOffset = rank == 1 ? 12.0 : 8.0;
 
           return Expanded(
             child: GestureDetector(
@@ -218,50 +257,58 @@ class _RankingScreenState extends State<RankingScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  // 캐릭터 파트
-                  Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Image.asset(
-                        "assets/images/level_${LevelService.getLevel(user['score'] ?? 0)}.png",
-                        width: rank == 1 ? 80 : 65,
-                      ),
-                      Positioned(
-                        top: rank == 1 ? 14 : 18,
-                        left: rank == 1 ? 33 : 30,
-                        child: CircleAvatar(
-                          radius: rank == 1 ? 16 : 12,
+                  // 💡 1. Transform.translate를 써서 프로필과 닉네임을 아래로(Y축) 강제로 끌어내립니다!
+                  Transform.translate(
+                    offset: Offset(0, pushDownOffset),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircleAvatar(
+                          radius: avatarRadius,
+                          backgroundColor: Colors.transparent,
                           backgroundImage:
                               (user['profileUrl'] != null &&
                                   user['profileUrl'] != "")
                               ? NetworkImage(user['profileUrl'])
-                              : null,
-                          child:
-                              (user['profileUrl'] == null ||
-                                  user['profileUrl'] == "")
-                              ? const Icon(
-                                  Icons.person,
-                                  color: Colors.grey,
-                                  size: 10,
-                                )
-                              : null,
+                                    as ImageProvider
+                              : const AssetImage(
+                                  'assets/images/default_profile.png',
+                                ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    user['nickname'] ?? "익명",
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: isMe ? FontWeight.bold : FontWeight.w600,
-                      color: isMe ? const Color(0xFF7B61FF) : Colors.black87,
+                        const SizedBox(width: 2),
+                        Flexible(
+                          child: Text(
+                            user['nickname'] ?? "익명",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: isMe
+                                  ? FontWeight.bold
+                                  : FontWeight.w800,
+                              color: isMe
+                                  ? const Color(0xFF7B61FF)
+                                  : Colors.black87,
+                              shadows: [
+                                Shadow(
+                                  offset: const Offset(0, 0),
+                                  blurRadius: 3.0,
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                ),
+                              ],
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 8),
 
-                  // 💡 시상대 막대(기둥)
+                  // 💡 2. 캐릭터 이미지 (위에서 끌어내린 닉네임과 거리가 확 좁혀짐)
+                  Image.asset(
+                    "assets/images/level_${LevelService.getLevel(user['score'] ?? 0)}.png",
+                    width: rank == 1 ? 90 : 75,
+                  ),
+
+                  // 💡 3. 시상대 막대
                   Container(
                     width: 60,
                     height: barHeight,
@@ -282,7 +329,7 @@ class _RankingScreenState extends State<RankingScreen> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
+                          color: Colors.black.withValues(alpha: 0.1),
                           blurRadius: 4,
                           offset: const Offset(0, -2),
                         ),
@@ -310,6 +357,7 @@ class _RankingScreenState extends State<RankingScreen> {
     );
   }
 
+  // 리스트 아이템
   Widget _buildListItem(
     Map<String, dynamic> user,
     int rank, {
@@ -317,6 +365,8 @@ class _RankingScreenState extends State<RankingScreen> {
     bool isSpecial = false,
   }) {
     int userLevel = LevelService.getLevel(user['score'] ?? 0);
+    const double listAvatarRadius = 12;
+
     return GestureDetector(
       onTap: () => _showProfile(user),
       child: Container(
@@ -339,9 +389,10 @@ class _RankingScreenState extends State<RankingScreen> {
         child: Row(
           children: [
             SizedBox(
-              width: 35,
+              width: 24,
               child: Text(
                 "$rank",
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: isMe ? const Color(0xFF7B61FF) : Colors.grey,
@@ -349,55 +400,57 @@ class _RankingScreenState extends State<RankingScreen> {
                 ),
               ),
             ),
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                Image.asset(
-                  "assets/images/level_$userLevel.png",
-                  width: 55,
-                  height: 55,
-                  fit: BoxFit.contain,
-                ),
-                Positioned(
-                  top: 15,
-                  left: 24,
-                  child: CircleAvatar(
-                    radius: 11,
-                    backgroundImage:
-                        (user['profileUrl'] != null && user['profileUrl'] != "")
-                        ? NetworkImage(user['profileUrl'])
-                        : null,
-                    child:
-                        (user['profileUrl'] == null || user['profileUrl'] == "")
-                        ? const Icon(Icons.person, size: 10)
-                        : null,
-                  ),
-                ),
-              ],
+            const SizedBox(width: 8),
+            Image.asset(
+              "assets/images/level_$userLevel.png",
+              width: 50,
+              height: 50,
+              fit: BoxFit.contain,
             ),
-            const SizedBox(width: 15),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    user['nickname'] ?? "익명",
-                    style: TextStyle(
-                      fontWeight: isMe ? FontWeight.bold : FontWeight.w500,
-                      fontSize: 15,
-                    ),
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: listAvatarRadius,
+                        backgroundColor: Colors.transparent,
+                        backgroundImage:
+                            (user['profileUrl'] != null &&
+                                user['profileUrl'] != "")
+                            ? NetworkImage(user['profileUrl']) as ImageProvider
+                            : const AssetImage(
+                                'assets/images/default_profile.png',
+                              ),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          user['nickname'] ?? "익명",
+                          style: TextStyle(
+                            fontWeight: isMe
+                                ? FontWeight.bold
+                                : FontWeight.w500,
+                            fontSize: 15,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    "Lv.$userLevel ${LevelService.getLevelName(userLevel)}",
-                    style: const TextStyle(fontSize: 11, color: Colors.grey),
-                  ),
+
                   if (isSpecial)
-                    const Text(
-                      "나의 현재 순위",
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF7B61FF),
-                        fontWeight: FontWeight.bold,
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: Text(
+                        "나의 현재 순위",
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF7B61FF),
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                 ],

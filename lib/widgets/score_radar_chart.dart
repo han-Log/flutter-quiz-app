@@ -22,8 +22,8 @@ class ScoreRadarChart extends StatelessWidget {
                 0xFF7B61FF,
               ).withValues(alpha: 0.25), // 내부 채우기
               borderColor: const Color(0xFF7B61FF), // 테두리 색상
-              entryRadius: 3, // 꼭짓점 점 크기
-              borderWidth: 2, // 테두리 두께
+              entryRadius: 1, // 꼭짓점 점 크기
+              borderWidth: 0.5, // 테두리 두께
               dataEntries: scores.map((s) => RadarEntry(value: s)).toList(),
             ),
           ],
@@ -31,7 +31,7 @@ class ScoreRadarChart extends StatelessWidget {
           // 2. 외형 및 가이드 라인 설정
           radarShape: RadarShape.polygon, // [중요] 원형이 아닌 칠각형 모양으로 설정
           gridBorderData: BorderSide(
-            color: Colors.grey.withValues(alpha: 0.3),
+            color: Colors.grey.withValues(alpha: 0.15),
             width: 1,
           ),
 
@@ -41,20 +41,20 @@ class ScoreRadarChart extends StatelessWidget {
             color: Colors.transparent,
           ), // 수치 텍스트는 숨김
           tickBorderData: BorderSide(
-            color: Colors.grey.withValues(alpha: 0.1), // 내부 선들의 색상
+            color: Colors.grey.withValues(alpha: 0.15), // 내부 선들의 색상
             width: 0.5,
           ),
 
           // 4. 각 영역 라벨 설정
           getTitle: (index, angle) {
             final labels = ['사회', '인문', '예술', '역사', '경제', '과학', '일상'];
-            return RadarChartTitle(text: labels[index], angle: 0);
+            return RadarChartTitle(text: labels[index], angle: 1);
           },
           titlePositionPercentageOffset: 0.15,
           titleTextStyle: const TextStyle(
-            color: Colors.black,
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
+            color: Color.fromARGB(255, 37, 36, 36),
+            fontSize: 11,
+            fontWeight: FontWeight.normal,
           ),
         ),
       ),

@@ -4,7 +4,6 @@ import '../theme/app_theme.dart';
 import '../widgets/attendance_grass_widget.dart';
 import '../widgets/score_radar_chart.dart';
 
-// 유저의 홈 정보를 나타내는 위젯
 class UserInfoView extends StatelessWidget {
   final Map<String, dynamic> userData;
   final AnimationController floatController;
@@ -22,6 +21,10 @@ class UserInfoView extends StatelessWidget {
         ? (userData['score'] as num).toInt()
         : 0;
     final int level = LevelService.getLevel(score);
+
+    final int answerStreak = userData['answerStreak'] ?? 0;
+    final int attendanceStreak = userData['attendanceStreak'] ?? 0;
+
     final Map<String, dynamic> attendance = userData['attendance'] is Map
         ? Map<String, dynamic>.from(userData['attendance'])
         : {};
@@ -48,7 +51,6 @@ class UserInfoView extends StatelessWidget {
       '과학',
       '일상',
     ];
-
     List<double> chartScores = categoryOrder
         .map((cat) {
           var stats = categories[cat];
@@ -60,38 +62,43 @@ class UserInfoView extends StatelessWidget {
 
     return Column(
       children: [
-        // 1. 수족관 배경 & 캐릭터 (💡 레벨별 배경 적용됨)
+        // 1. 수족관 배경 & 캐릭터
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Stack(
             alignment: Alignment.center,
             children: [
-              _buildRoundedBackground(level), // 레벨 전달
+              _buildRoundedBackground(level),
               _buildAnimatedFish(LevelService.getSafeLevel(level)),
-              Positioned(bottom: 15, child: _buildLevelBadge(level, score)),
             ],
           ),
         ),
-        const SizedBox(height: 25),
 
-        // 2. 스탯 카드
+        // 2. 연속 기록 대시보드 (2단 카드)
+        _buildStreakDashboard(answerStreak, attendanceStreak),
+
+        const SizedBox(height: 12),
+
+        // 💡 3. 학습 스탯 카드 (3단 카드 - 푼 문제, 정답, 정답률)
         _buildStatCards(totalSolved, totalCorrect),
+
         const SizedBox(height: 35),
 
-        // 3. 학습 리포트
+        // 4. 학습 리포트
         _buildSectionTitle("2026년 학습 리포트"),
         const SizedBox(height: 12),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Container(
             padding: const EdgeInsets.all(20),
-            decoration: AppDesign.cardDecoration(), // 💡 공통 디자인 적용
+            decoration: AppDesign.cardDecoration(),
             child: AttendanceGrassWidget(attendance: attendance),
           ),
         ),
+
         const SizedBox(height: 25),
 
-        // 4. 역량 분석 (칠각형 레이더 차트)
+        // 5. 역량 분석
         _buildSectionTitle("영역별 역량 분석"),
         const SizedBox(height: 12),
         _buildAnalysisSection(chartScores),
@@ -99,82 +106,136 @@ class UserInfoView extends StatelessWidget {
     );
   }
 
-  // --- 내부 빌드 메서드들 ---
-
-  Widget _buildAnimatedFish(int safeLevel) => AnimatedBuilder(
-    animation: floatController,
-    builder: (context, child) => Transform.translate(
-      offset: Offset(0, floatController.value * 15 - 7.5),
-      child: Image.asset(
-        'assets/images/level_$safeLevel.png',
-        width: 130,
-        errorBuilder: (context, error, stackTrace) =>
-            const Icon(Icons.help_outline, size: 100, color: Colors.white70),
-      ),
-    ),
-  );
-
-  Widget _buildLevelBadge(int level, int score) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.9),
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: Text(
-      "Lv.$level ${LevelService.getLevelName(level)} ($score pts)",
-      style: const TextStyle(
-        color: AppColors.deepPurple,
-        fontSize: 13,
-        fontWeight: FontWeight.bold,
-      ),
-    ),
-  );
-
-  Widget _buildStatCards(int solved, int correct) {
-    double accuracy = solved == 0 ? 0 : (correct / solved) * 100;
+  // --- 💡 연속 기록 대시보드 (2칸) ---
+  Widget _buildStreakDashboard(int answerStreak, int attendanceStreak) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         children: [
-          _buildStatBox("푼 문제", "$solved", AppColors.infoBlue),
+          _buildInfoCard(
+            "연속 정답",
+            "$answerStreak회",
+            Icons.local_fire_department,
+            const Color(0xFFFF5252),
+            isTriple: false,
+          ),
           const SizedBox(width: 10),
-          _buildStatBox("정답", "$correct", AppColors.infoGreen),
-          const SizedBox(width: 10),
-          _buildStatBox(
-            "정답률",
-            "${accuracy.toStringAsFixed(1)}%",
-            AppColors.infoOrange,
+          _buildInfoCard(
+            "연속 출석",
+            "$attendanceStreak일",
+            Icons.calendar_today_rounded,
+            const Color(0xFF4CAF50),
+            isTriple: false,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatBox(String label, String value, Color color) => Expanded(
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: AppDesign.cardDecoration(
-        borderColor: color.withValues(alpha: 0.3),
-      ),
-      child: Column(
+  // --- 💡 학습 스탯 카드 (3칸 - 요청하신 변경 사항) ---
+  Widget _buildStatCards(int solved, int correct) {
+    double accuracy = solved == 0 ? 0 : (correct / solved) * 100;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
         children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
+          _buildInfoCard(
+            "푼 문제",
+            "$solved",
+            Icons.edit_note_rounded,
+            AppColors.infoBlue,
+            isTriple: true,
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.explainTextColor,
-            ),
+          const SizedBox(width: 8),
+          _buildInfoCard(
+            "정답",
+            "$correct",
+            Icons.check_circle_outline_rounded,
+            AppColors.infoGreen,
+            isTriple: true,
+          ),
+          const SizedBox(width: 8),
+          _buildInfoCard(
+            "정답률",
+            "${accuracy.toStringAsFixed(1)}%",
+            Icons.insights_rounded,
+            AppColors.infoOrange,
+            isTriple: true,
           ),
         ],
+      ),
+    );
+  }
+
+  // --- 💡 공통 정보 카드 빌더 (2칸/3칸 겸용) ---
+  Widget _buildInfoCard(
+    String label,
+    String value,
+    IconData icon,
+    Color color, {
+    required bool isTriple,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          vertical: 14,
+          horizontal: isTriple ? 8 : 12,
+        ),
+        decoration: AppDesign.cardDecoration(),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 아이콘 배경
+            Container(
+              padding: EdgeInsets.all(isTriple ? 6 : 8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: isTriple ? 16 : 18),
+            ),
+            SizedBox(width: isTriple ? 6 : 10),
+            // 텍스트 영역
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: isTriple ? 9 : 10,
+                      color: AppColors.explainTextColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: isTriple ? 13 : 14,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF101828),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- 나머지 기존 메서드들 ---
+  Widget _buildAnimatedFish(int safeLevel) => AnimatedBuilder(
+    animation: floatController,
+    builder: (context, child) => Transform.translate(
+      offset: Offset(0, floatController.value * 15 - 7.5),
+      child: Image.asset(
+        'assets/images/level_$safeLevel.png',
+        width: 350,
+        errorBuilder: (context, error, stackTrace) =>
+            const Icon(Icons.help_outline, size: 100, color: Colors.white70),
       ),
     ),
   );
@@ -202,10 +263,8 @@ class UserInfoView extends StatelessWidget {
     ),
   );
 
-  // 💡 레벨에 따라 배경 이미지를 동적으로 로드함
   Widget _buildRoundedBackground(int level) {
     final String bgName = LevelService.getLevelBackground(level);
-
     return Container(
       width: double.infinity,
       height: 240,
@@ -224,10 +283,8 @@ class UserInfoView extends StatelessWidget {
         child: Image.asset(
           'assets/images/$bgName',
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => Image.asset(
-            'assets/images/sea.jpg',
-            fit: BoxFit.cover,
-          ), // 기본 배경 방어코드
+          errorBuilder: (context, error, stackTrace) =>
+              Image.asset('assets/images/sea.jpeg', fit: BoxFit.cover),
         ),
       ),
     );

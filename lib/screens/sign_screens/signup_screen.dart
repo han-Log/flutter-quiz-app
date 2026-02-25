@@ -1,22 +1,47 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
+import '../../theme/app_theme.dart';
 
-// 회원가입 스크린
-class SignupScreen extends StatefulWidget {
+// 💡 여기를 StatelessWidget으로 수정했습니다.
+// StatefulWidget은 createState()가 필요하지만, 이 클래스는 build만 있으면 되거든요!
+class SignupScreen extends StatelessWidget {
   const SignupScreen({super.key});
 
   @override
-  State<SignupScreen> createState() => _SignupScreenState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: AppColors.deepPurple,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: const SignupBody(),
+    );
+  }
 }
 
-class _SignupScreenState extends State<SignupScreen> {
+// 💡 실제 상태(State) 관리는 여기서 진행됩니다.
+class SignupBody extends StatefulWidget {
+  const SignupBody({super.key});
+
+  @override
+  State<SignupBody> createState() => _SignupBodyState();
+}
+
+class _SignupBodyState extends State<SignupBody> {
   final _emailController = TextEditingController();
   final _pwController = TextEditingController();
   final _confirmPwController = TextEditingController();
   final _nicknameController = TextEditingController();
   final AuthService _authService = AuthService();
 
-  // 💡 로딩 상태를 관리하여 중복 클릭을 방지합니다.
   bool _isLoading = false;
 
   void _onSignup() async {
@@ -25,24 +50,14 @@ class _SignupScreenState extends State<SignupScreen> {
     final confirmPw = _confirmPwController.text.trim();
     final nickname = _nicknameController.text.trim();
 
-    // 1. 사전 유효성 검사 (입력값 체크)
     if (nickname.isEmpty) return _showSnack("닉네임을 입력해주세요.");
     if (email.isEmpty) return _showSnack("이메일을 입력해주세요.");
+    if (password.length < 6) return _showSnack("비밀번호는 최소 6자리 이상이어야 합니다.");
+    if (password != confirmPw) return _showSnack("비밀번호가 일치하지 않습니다.");
 
-    // 💡 Firebase 정책에 따라 비밀번호 6자 미만(aaa 등) 사전 차단
-    if (password.length < 6) {
-      return _showSnack("비밀번호는 최소 6자리 이상이어야 합니다.");
-    }
-
-    if (password != confirmPw) {
-      return _showSnack("비밀번호가 일치하지 않습니다.");
-    }
-
-    // 2. 가입 프로세스 시작
     setState(() => _isLoading = true);
 
     try {
-      // 💡 AuthService의 signUpEmail이 String?을 반환하도록 설계되었습니다.
       final String? errorMsg = await _authService.signUpEmail(
         email,
         password,
@@ -53,17 +68,15 @@ class _SignupScreenState extends State<SignupScreen> {
       setState(() => _isLoading = false);
 
       if (errorMsg == null) {
-        // ✅ 가입 성공
         _showSnack("회원가입이 완료되었습니다!", isError: false);
-        Navigator.pop(context); // 가입 성공 후 로그인 창으로 이동
+        Navigator.pop(context);
       } else {
-        // ❌ 가입 실패 (중복 이메일 등 한글 에러 메시지 출력)
         _showSnack(errorMsg);
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      _showSnack("회원가입 중 예상치 못한 오류가 발생했습니다.");
+      _showSnack("회원가입 중 오류가 발생했습니다.");
     }
   }
 
@@ -72,109 +85,96 @@ class _SignupScreenState extends State<SignupScreen> {
       SnackBar(
         content: Text(msg),
         backgroundColor: isError ? Colors.redAccent : Colors.green,
-        behavior: SnackBarBehavior.floating, // 디자인을 위해 플로팅 스타일 적용
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
 
   @override
-  void dispose() {
-    _emailController.dispose();
-    _pwController.dispose();
-    _confirmPwController.dispose();
-    _nicknameController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF101828)),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 32.0),
-          child: Column(
-            children: [
-              const SizedBox(height: 20),
-              const Text(
-                "회원가입",
-                style: TextStyle(
-                  color: Color(0xFF101828),
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 30),
+        child: Column(
+          children: [
+            const Text(
+              "회원가입",
+              style: TextStyle(
+                color: AppColors.deepPurple,
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -1.0,
               ),
-              const SizedBox(height: 8),
-              const Text(
-                "새로운 계정을 만들어보세요.",
-                style: TextStyle(color: Color(0xFF475467), fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              "상식 한 입과 함께할 계정을 만들어보세요",
+              style: TextStyle(
+                color: AppColors.explainTextColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
               ),
-              const SizedBox(height: 40),
+            ),
+            const SizedBox(height: 40),
 
-              _buildLabel("Nickname"),
-              _buildTextField(
-                controller: _nicknameController,
-                hint: "Your Nickname",
-                icon: Icons.face_outlined,
-              ),
-              const SizedBox(height: 20),
+            _buildLabel("Nickname"),
+            _buildTextField(
+              controller: _nicknameController,
+              hint: "사용하실 닉네임을 입력해주세요",
+              icon: Icons.face_rounded,
+            ),
+            const SizedBox(height: 20),
 
-              _buildLabel("Email"),
-              _buildTextField(
-                controller: _emailController,
-                hint: "Your Email",
-                icon: Icons.mail_outline,
-              ),
-              const SizedBox(height: 20),
+            _buildLabel("Email Address"),
+            _buildTextField(
+              controller: _emailController,
+              hint: "이메일 주소를 입력해주세요",
+              icon: Icons.alternate_email_rounded,
+            ),
+            const SizedBox(height: 20),
 
-              _buildLabel("Password"),
-              _buildTextField(
-                controller: _pwController,
-                hint: "Your Password",
-                icon: Icons.lock_outline,
-                isPassword: true,
-              ),
-              const SizedBox(height: 20),
+            _buildLabel("Password"),
+            _buildTextField(
+              controller: _pwController,
+              hint: "비밀번호 (6자 이상)",
+              icon: Icons.lock_outline_rounded,
+              isPassword: true,
+            ),
+            const SizedBox(height: 20),
 
-              _buildLabel("Confirm Password"),
-              _buildTextField(
-                controller: _confirmPwController,
-                hint: "Confirm Your Password",
-                icon: Icons.check_circle_outline,
-                isPassword: true,
-              ),
+            _buildLabel("Confirm Password"),
+            _buildTextField(
+              controller: _confirmPwController,
+              hint: "비밀번호를 한 번 더 입력해주세요",
+              icon: Icons.check_circle_outline_rounded,
+              isPassword: true,
+            ),
 
-              const SizedBox(height: 70),
+            const SizedBox(height: 50),
 
-              // 가입하기 버튼
-              Container(
+            GestureDetector(
+              onTap: _isLoading ? null : _onSignup,
+              child: Container(
                 width: double.infinity,
-                height: 56,
+                height: 60,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(18),
                   gradient: LinearGradient(
                     colors: _isLoading
-                        ? [Colors.grey, Colors.grey] // 로딩 중 버튼 색상 비활성화 느낌
-                        : [const Color(0xFF8A72FF), const Color(0xFF7B61FF)],
+                        ? [Colors.grey.shade300, Colors.grey.shade400]
+                        : [const Color(0xFF8A72FF), AppColors.primaryPurple],
                   ),
+                  boxShadow: [
+                    if (!_isLoading)
+                      BoxShadow(
+                        color: AppColors.primaryPurple.withValues(alpha: 0.25),
+                        blurRadius: 15,
+                        offset: const Offset(0, 6),
+                      ),
+                  ],
                 ),
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _onSignup, // 로딩 중 클릭 차단
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
+                child: Center(
                   child: _isLoading
                       ? const SizedBox(
                           width: 24,
@@ -194,9 +194,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                 ),
               ),
-              const SizedBox(height: 24),
-            ],
-          ),
+            ),
+            const SizedBox(height: 40),
+          ],
         ),
       ),
     );
@@ -204,14 +204,14 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Widget _buildLabel(String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
+      padding: const EdgeInsets.only(left: 4, bottom: 8.0),
       child: Align(
         alignment: Alignment.centerLeft,
         child: Text(
           text,
           style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF344054),
+            fontWeight: FontWeight.bold,
+            color: AppColors.deepPurple,
             fontSize: 14,
           ),
         ),
@@ -227,18 +227,23 @@ class _SignupScreenState extends State<SignupScreen> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD0D5DD)),
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEAECF0)),
       ),
       child: TextField(
         controller: controller,
         obscureText: isPassword,
+        style: const TextStyle(
+          color: AppColors.deepPurple,
+          fontWeight: FontWeight.w500,
+        ),
         decoration: InputDecoration(
           hintText: hint,
-          prefixIcon: Icon(icon, color: const Color(0xFF7B61FF)),
+          hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+          prefixIcon: Icon(icon, color: AppColors.primaryPurple, size: 22),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(vertical: 18),
         ),
       ),
     );

@@ -3,9 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/level_service.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
-import 'edit_profile_screen.dart'; // 💡 새로 추가될 화면 임포트
+import 'edit_profile_screen.dart';
+import 'package:login/theme/app_theme.dart';
 
-// 내 프로필과 설정과 관련된 스크린
 class MyProfileScreen extends StatelessWidget {
   final Map<String, dynamic> userData;
 
@@ -17,33 +17,23 @@ class MyProfileScreen extends StatelessWidget {
     final DatabaseService dbService = DatabaseService();
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F9FB),
       appBar: AppBar(
         title: const Text(
           "마이페이지",
           style: TextStyle(
             color: Color(0xFF101828),
             fontWeight: FontWeight.bold,
+            fontSize: 18,
           ),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.grey),
-            onPressed: () async {
-              await authService.signOut();
-              if (!context.mounted) return;
-              Navigator.pushReplacementNamed(context, '/login');
-            },
-          ),
-        ],
       ),
       body: StreamBuilder<DocumentSnapshot>(
         stream: dbService.userDataStream,
         builder: (context, snapshot) {
-          // 실시간 데이터가 있으면 업데이트, 없으면 전달받은 기본 데이터 사용
           var liveData = snapshot.hasData && snapshot.data!.data() != null
               ? snapshot.data!.data() as Map<String, dynamic>
               : userData;
@@ -51,65 +41,23 @@ class MyProfileScreen extends StatelessWidget {
           int exp = liveData['score'] ?? 0;
           int level = LevelService.getLevel(exp);
 
-          return Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+          return SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 💡 프로필 이미지
-                CircleAvatar(
-                  radius: 50,
-                  backgroundColor: Colors.grey[200],
-                  backgroundImage:
-                      liveData['profileUrl'] != null &&
-                          liveData['profileUrl'].toString().isNotEmpty
-                      ? NetworkImage(liveData['profileUrl'])
-                      : const AssetImage('assets/images/default_profile.png')
-                            as ImageProvider,
-                  child:
-                      liveData['profileUrl'] == null ||
-                          liveData['profileUrl'].toString().isEmpty
-                      ? const Icon(Icons.person, size: 50, color: Colors.grey)
-                      : null,
-                ),
-                const SizedBox(height: 20),
-
-                // 💡 닉네임
-                Text(
-                  liveData['nickname'] ?? "익명",
-                  style: const TextStyle(
-                    fontSize: 24,
+                const Text(
+                  "내 정보",
+                  style: TextStyle(
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF101828),
+                    color: Colors.grey,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
 
-                // 💡 레벨 정보
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF2F4FF),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    "Lv.$level ${LevelService.getLevelName(level)}",
-                    style: const TextStyle(
-                      color: Color(0xFF7B61FF),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 30),
-
-                // 💡 [새로운 버튼] 내 정보 변경 버튼
-                ElevatedButton(
-                  onPressed: () {
+                _buildMenuCard(
+                  onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -120,27 +68,142 @@ class MyProfileScreen extends StatelessWidget {
                       ),
                     );
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF7B61FF), // 버튼 배경색
-                    foregroundColor: Colors.white, // 버튼 글자색
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 40,
-                      vertical: 15,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 30,
+                        backgroundColor: AppColors.background,
+                        backgroundImage:
+                            liveData['profileUrl'] != null &&
+                                liveData['profileUrl'].toString().isNotEmpty
+                            ? NetworkImage(liveData['profileUrl'])
+                            : const AssetImage(
+                                    'assets/images/default_profile.png',
+                                  )
+                                  as ImageProvider,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              liveData['nickname'] ?? "익명",
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "Lv.$level ${LevelService.getLevelName(level)}",
+                              style: const TextStyle(
+                                color: AppColors.primaryPurple,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right, color: Colors.grey),
+                    ],
                   ),
-                  child: const Text(
-                    "내 정보 변경",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+
+                const SizedBox(height: 32),
+                const Text(
+                  "계정 설정",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // 💡 로그아웃 버튼 로직 수정
+                _buildMenuCard(
+                  onTap: () async {
+                    // 1. Firebase 로그아웃 수행
+                    await authService.signOut();
+
+                    if (!context.mounted) return;
+
+                    // 2. 웰컴 스크린으로 이동하며 모든 스택 비우기
+                    // 💡 pushNamedAndRemoveUntil을 쓰면 이전 화면으로 돌아갈 수 없습니다.
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      '/welcome', // main.dart에 등록한 welcome 경로
+                      (route) => false, // 모든 이전 경로 제거
+                    );
+                  },
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.logout,
+                          color: Colors.redAccent,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      const Text(
+                        "로그아웃",
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.redAccent,
+                        ),
+                      ),
+                      const Spacer(),
+                      const Icon(
+                        Icons.chevron_right,
+                        color: Colors.grey,
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 40),
+                const Center(
+                  child: Text(
+                    "Version 1.3.0",
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                 ),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildMenuCard({required Widget child, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: child,
       ),
     );
   }

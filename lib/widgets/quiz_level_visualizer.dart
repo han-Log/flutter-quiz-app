@@ -40,7 +40,7 @@ class QuizLevelVisualizer extends StatelessWidget {
             child: Center(
               child: Image.asset(
                 'assets/images/level_$level.png',
-                width: 140,
+                width: 200,
                 errorBuilder: (context, error, stackTrace) =>
                     const Icon(Icons.pets, size: 100, color: Colors.white24),
               ),

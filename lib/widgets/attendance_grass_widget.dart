@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-// github 잔디 기능
 class AttendanceGrassWidget extends StatelessWidget {
   final Map<String, dynamic> attendance;
   final int year;
@@ -15,10 +14,9 @@ class AttendanceGrassWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      // 💡 외부 Container(HomeScreen)에서 이미 마진과 패딩을 주므로 내부 마진은 제거했습니다.
       padding: const EdgeInsets.symmetric(vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white, // 👈 배경색을 흰색으로 변경
+        color: Colors.white,
         borderRadius: BorderRadius.circular(25),
       ),
       child: Row(
@@ -45,7 +43,7 @@ class AttendanceGrassWidget extends StatelessWidget {
     );
   }
 
-  // 💡 요일 라벨
+  // 💡 요일 라벨 (월, 수, 금 표시)
   Widget _buildDayLabels() {
     final days = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
     return Column(
@@ -70,7 +68,7 @@ class AttendanceGrassWidget extends StatelessWidget {
     );
   }
 
-  // 💡 월 라벨
+  // 💡 월 라벨 (간격 조정)
   Widget _buildFixedMonthLabels() {
     final months = [
       'Jan',
@@ -90,7 +88,7 @@ class AttendanceGrassWidget extends StatelessWidget {
       children: months
           .map(
             (m) => SizedBox(
-              width: 13 * 4.34,
+              width: 13 * 4.34, // 1주 13px * 한 달 평균 주차
               child: Text(
                 m,
                 style: const TextStyle(
@@ -105,7 +103,7 @@ class AttendanceGrassWidget extends StatelessWidget {
     );
   }
 
-  // 💡 잔디 컬럼
+  // 💡 잔디 컬럼 생성
   Widget _buildFixedGrassColumns() {
     DateTime firstDayOfYear = DateTime(year, 1, 1);
     int adjustment = firstDayOfYear.weekday % 7;
@@ -122,20 +120,25 @@ class AttendanceGrassWidget extends StatelessWidget {
                 Duration(days: (weekIndex * 7) + dayIndex),
               );
               String dateStr = DateFormat('yyyy-MM-dd').format(currentDate);
+
+              // 💡 Firestore에서 가져온 해당 날짜의 퀴즈 해결 수
               int count = attendance[dateStr] ?? 0;
 
               bool isThisYear = currentDate.year == year;
               bool isFuture = currentDate.isAfter(DateTime.now());
 
-              return Container(
-                width: 10,
-                height: 10,
-                margin: const EdgeInsets.only(bottom: 3),
-                decoration: BoxDecoration(
-                  color: (!isThisYear || isFuture)
-                      ? Colors.grey.withValues(alpha: 0.05) // [2026-02-22] 적용
-                      : _getGrassColor(count),
-                  borderRadius: BorderRadius.circular(2),
+              return Tooltip(
+                message: "$dateStr: $count 문제 해결", // 💡 누르면 정보 확인 가능
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  margin: const EdgeInsets.only(bottom: 3),
+                  decoration: BoxDecoration(
+                    color: (!isThisYear || isFuture)
+                        ? Colors.grey.withValues(alpha: 0.05)
+                        : _getGrassColor(count),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               );
             }),
@@ -145,11 +148,20 @@ class AttendanceGrassWidget extends StatelessWidget {
     );
   }
 
+  // 💡 [핵심] 퀴즈 개수에 따른 5단계 색상 로직
   Color _getGrassColor(int count) {
-    // [2026-02-22] 모든 투명도 처리를 withValues(alpha: ...)로 변경
-    if (count <= 0) return Colors.grey.withValues(alpha: 0.15);
-    if (count <= 3) return const Color(0xFF7B61FF).withValues(alpha: 0.3);
-    if (count <= 8) return const Color(0xFF7B61FF).withValues(alpha: 0.6);
-    return const Color(0xFF7B61FF);
+    const baseColor = Color(0xFF7B61FF); // 메인 테마 보라색
+
+    if (count <= 0) {
+      return Colors.grey.withValues(alpha: 0.15); // 활동 없음
+    } else if (count <= 3) {
+      return baseColor.withValues(alpha: 0.2); // 1~3문제: 연함
+    } else if (count <= 7) {
+      return baseColor.withValues(alpha: 0.45); // 4~7문제: 보통
+    } else if (count <= 12) {
+      return baseColor.withValues(alpha: 0.75); // 8~12문제: 진함
+    } else {
+      return baseColor; // 13문제 이상: 아주 진함 (최고 단계)
+    }
   }
 }

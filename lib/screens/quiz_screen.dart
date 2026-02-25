@@ -6,7 +6,6 @@ import '../services/level_service.dart';
 import 'package:login/theme/app_theme.dart';
 import '../widgets/quiz_level_visualizer.dart';
 
-// 퀴즈 시작 버튼 눌렀을 때 나오는 화면
 class QuizScreen extends StatefulWidget {
   final int initialExp;
   final List<String> selectedCategories;
@@ -33,6 +32,9 @@ class _QuizScreenState extends State<QuizScreen>
   late int _currentExp;
   bool _isLoading = true;
 
+  // 💡 [추가] 마지막 문제 정답 여부를 추적하기 위한 변수
+  bool _isLastCorrect = false;
+
   final Map<String, Map<String, int>> _sessionCategoryStats = {};
 
   @override
@@ -52,16 +54,12 @@ class _QuizScreenState extends State<QuizScreen>
     super.dispose();
   }
 
-  /// ✅ [수정된 부분] QuizService에 두 개의 인자를 전달합니다.
   void _loadQuizzes() async {
     try {
-      // 1. 현재 경험치를 바탕으로 레벨 계산
       final int userLevel = LevelService.getLevel(_currentExp);
-
-      // 2. [에러 해결 지점] 두 번째 인자인 userLevel을 추가했습니다.
       final quizzes = await _quizService.generateQuizzes(
         widget.selectedCategories,
-        userLevel, // 👈 이 부분이 추가되어야 에러가 사라집니다!
+        userLevel,
       );
 
       setState(() {
@@ -84,6 +82,9 @@ class _QuizScreenState extends State<QuizScreen>
     final String category = currentQuiz.category;
     bool isCorrect = index == currentQuiz.answerIndex;
 
+    // 💡 마지막 문제 여부와 상관없이 현재 정답 여부 기록
+    _isLastCorrect = isCorrect;
+
     if (!_sessionCategoryStats.containsKey(category)) {
       _sessionCategoryStats[category] = {'total': 0, 'correct': 0};
     }
@@ -95,13 +96,14 @@ class _QuizScreenState extends State<QuizScreen>
           _sessionCategoryStats[category]!['correct']! + 1;
       setState(() {
         _correctCount++;
-        _currentExp++;
+        _currentExp += 10; // 💡 경험치 상승 폭 조정 (문제당 10점 등)
       });
     }
 
     _showResultDialog(isCorrect, currentQuiz);
   }
 
+  // 결과 다이얼로그 (기존과 동일)
   void _showResultDialog(bool isCorrect, Quiz currentQuiz) {
     showDialog(
       context: context,
@@ -120,7 +122,7 @@ class _QuizScreenState extends State<QuizScreen>
           children: [
             Text(
               isCorrect
-                  ? "경험치가 1 올랐습니다!"
+                  ? "경험치가 올랐습니다!"
                   : "정답은 '${currentQuiz.options[currentQuiz.answerIndex]}' 입니다.",
               textAlign: TextAlign.center,
             ),
@@ -163,33 +165,33 @@ class _QuizScreenState extends State<QuizScreen>
     );
   }
 
+  // 💡 [수정된 핵심 로직] 퀴즈 종료 및 DB 저장
   void _finishQuiz() async {
     setState(() => _isLoading = true);
 
-    // 💡 해결책: '총 점수'를 보내는 게 아니라 '이번 퀴즈에서 얻은 점수'만 보내야 합니다.
-    // 또는 DatabaseService의 로직을 '더하기'가 아니라 '덮어쓰기'로 바꿔야 해요.
-
-    // 방법 1: 이번 세션에서 새로 얻은 점수만 계산해서 보내기
+    // 1. 얻은 경험치 계산
     int gainedExp = _currentExp - widget.initialExp;
 
+    // 2. 통합된 DatabaseService 함수 호출
     await _dbService.updateQuizResults(
-      _sessionCategoryStats,
-      gainedExp, // 👈 '전체 점수'가 아닌 '늘어난 점수'만 전달!
-      _correctCount,
+      sessionStats: _sessionCategoryStats,
+      newExp: gainedExp,
+      totalSolved: _quizzes.length, // 오늘 푼 문제 수 (잔디용)
+      totalCorrect: _correctCount, // 맞힌 문제 수
+      isLastCorrect: _isLastCorrect, // 연속 정답 여부 (스트릭용)
     );
 
     if (!mounted) return;
+    // 3. 업데이트된 총 경험치를 가지고 홈으로 복귀
     Navigator.pop(context, _currentExp);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    if (_isLoading)
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
 
     final screenHeight = MediaQuery.of(context).size.height;
-    final double visualizerHeight = screenHeight * 0.35;
     final quiz = _quizzes[_currentIndex];
     int currentLevel = LevelService.getLevel(_currentExp);
 
@@ -210,7 +212,7 @@ class _QuizScreenState extends State<QuizScreen>
             clipBehavior: Clip.none,
             children: [
               QuizLevelVisualizer(
-                height: visualizerHeight,
+                height: screenHeight * 0.35,
                 level: LevelService.getSafeLevel(currentLevel),
                 floatAnimation: _floatController,
               ),
@@ -232,48 +234,45 @@ class _QuizScreenState extends State<QuizScreen>
             ],
           ),
           Expanded(
-            child: Container(
-              color: Colors.white,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
-                child: Column(
-                  children: [
-                    _buildQuizHeader(currentLevel),
-                    const SizedBox(height: 25),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        child: Column(
-                          children: [
-                            Text(
-                              "Q${_currentIndex + 1}. [${quiz.category}]",
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primaryPurple,
-                              ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                children: [
+                  _buildQuizHeader(currentLevel),
+                  const SizedBox(height: 25),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Column(
+                        children: [
+                          Text(
+                            "Q${_currentIndex + 1}. [${quiz.category}]",
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryPurple,
                             ),
-                            const SizedBox(height: 12),
-                            Text(
-                              quiz.question,
-                              style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.deepPurple,
-                              ),
-                              textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            quiz.question,
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.deepPurple,
                             ),
-                            const SizedBox(height: 35),
-                            ...List.generate(
-                              quiz.options.length,
-                              (i) => _buildOptionButton(i, quiz.options[i]),
-                            ),
-                          ],
-                        ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 35),
+                          ...List.generate(
+                            quiz.options.length,
+                            (i) => _buildOptionButton(i, quiz.options[i]),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -304,14 +303,11 @@ class _QuizScreenState extends State<QuizScreen>
         ],
       ),
       const SizedBox(height: 10),
-      ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: LinearProgressIndicator(
-          value: (_currentIndex + 1) / _quizzes.length,
-          minHeight: 8,
-          backgroundColor: const Color(0xFFF2F4FF),
-          color: AppColors.primaryPurple,
-        ),
+      LinearProgressIndicator(
+        value: (_currentIndex + 1) / _quizzes.length,
+        minHeight: 8,
+        backgroundColor: const Color(0xFFF2F4FF),
+        color: AppColors.primaryPurple,
       ),
     ],
   );
