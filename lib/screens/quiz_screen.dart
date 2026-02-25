@@ -32,8 +32,9 @@ class _QuizScreenState extends State<QuizScreen>
   late int _currentExp;
   bool _isLoading = true;
 
-  // 💡 [추가] 마지막 문제 정답 여부를 추적하기 위한 변수
-  bool _isLastCorrect = false;
+  // 💡 [개선된 스트릭 추적 변수]
+  int _sessionStreak = 0; // 현재 세션 내에서 유지 중인 연속 정답 수
+  bool _hasFailedThisSession = false; // 이번 세션 중 한 번이라도 틀렸는지 기록
 
   final Map<String, Map<String, int>> _sessionCategoryStats = {};
 
@@ -42,6 +43,8 @@ class _QuizScreenState extends State<QuizScreen>
     super.initState();
     _currentExp = widget.initialExp;
     _loadQuizzes();
+
+    // 캐릭터 둥둥 애니메이션 유지
     _floatController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -82,9 +85,7 @@ class _QuizScreenState extends State<QuizScreen>
     final String category = currentQuiz.category;
     bool isCorrect = index == currentQuiz.answerIndex;
 
-    // 💡 마지막 문제 여부와 상관없이 현재 정답 여부 기록
-    _isLastCorrect = isCorrect;
-
+    // 카테고리 통계 기록 유지
     if (!_sessionCategoryStats.containsKey(category)) {
       _sessionCategoryStats[category] = {'total': 0, 'correct': 0};
     }
@@ -94,16 +95,23 @@ class _QuizScreenState extends State<QuizScreen>
     if (isCorrect) {
       _sessionCategoryStats[category]!['correct'] =
           _sessionCategoryStats[category]!['correct']! + 1;
+
+      // 🔥 [스트릭 로직 핵심] 맞히면 세션 내 스트릭 카운트 증가
+      _sessionStreak++;
+
       setState(() {
         _correctCount++;
-        _currentExp += 10; // 💡 경험치 상승 폭 조정 (문제당 10점 등)
+        _currentExp += 1; // 문제당 1점 (기존 설정 유지)
       });
+    } else {
+      // 🔥 [스트릭 로직 핵심] 틀리면 스트릭은 즉시 0, 세션 실패 기록 남김
+      _sessionStreak = 0;
+      _hasFailedThisSession = true;
     }
 
     _showResultDialog(isCorrect, currentQuiz);
   }
 
-  // 결과 다이얼로그 (기존과 동일)
   void _showResultDialog(bool isCorrect, Quiz currentQuiz) {
     showDialog(
       context: context,
@@ -115,6 +123,7 @@ class _QuizScreenState extends State<QuizScreen>
           textAlign: TextAlign.center,
           style: TextStyle(
             color: isCorrect ? AppColors.primaryPurple : Colors.redAccent,
+            fontWeight: FontWeight.bold,
           ),
         ),
         content: Column(
@@ -127,18 +136,31 @@ class _QuizScreenState extends State<QuizScreen>
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 15),
+
+            // 💡 [시각적 피드백] 현재 실시간 스트릭 표시
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
                 color: const Color(0xFFF2F4FF),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(
-                "현재 등급: ${LevelService.getLevelName(LevelService.getLevel(_currentExp))}",
-                style: const TextStyle(
-                  color: AppColors.primaryPurple,
-                  fontWeight: FontWeight.bold,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.fireplace_rounded,
+                    color: Colors.orange,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    "연속 정답: $_sessionStreak",
+                    style: const TextStyle(
+                      color: AppColors.primaryPurple,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -165,31 +187,34 @@ class _QuizScreenState extends State<QuizScreen>
     );
   }
 
-  // 💡 [수정된 핵심 로직] 퀴즈 종료 및 DB 저장
   void _finishQuiz() async {
     setState(() => _isLoading = true);
 
-    // 1. 얻은 경험치 계산
     int gainedExp = _currentExp - widget.initialExp;
 
-    // 2. 통합된 DatabaseService 함수 호출
+    // 💡 [DB 업데이트 호출] 바뀐 DatabaseService 파라미터에 맞춰 전송
     await _dbService.updateQuizResults(
       sessionStats: _sessionCategoryStats,
       newExp: gainedExp,
-      totalSolved: _quizzes.length, // 오늘 푼 문제 수 (잔디용)
-      totalCorrect: _correctCount, // 맞힌 문제 수
-      isLastCorrect: _isLastCorrect, // 연속 정답 여부 (스트릭용)
+      totalSolved: _quizzes.length,
+      totalCorrect: _correctCount,
+      sessionStreak: _sessionStreak, // 최종 세션 스트릭
+      failedThisSession: _hasFailedThisSession, // 세션 내 실패 기록 여부
     );
 
     if (!mounted) return;
-    // 3. 업데이트된 총 경험치를 가지고 홈으로 복귀
+    // 결과 전송 후 업데이트된 경험치를 가지고 홈으로 복귀
     Navigator.pop(context, _currentExp);
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading)
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primaryPurple),
+        ),
+      );
 
     final screenHeight = MediaQuery.of(context).size.height;
     final quiz = _quizzes[_currentIndex];
@@ -208,6 +233,7 @@ class _QuizScreenState extends State<QuizScreen>
       ),
       body: Column(
         children: [
+          // 수족관 비주얼 영역 유지
           Stack(
             clipBehavior: Clip.none,
             children: [
@@ -233,6 +259,7 @@ class _QuizScreenState extends State<QuizScreen>
               ),
             ],
           ),
+
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -281,6 +308,7 @@ class _QuizScreenState extends State<QuizScreen>
     );
   }
 
+  // 상단 진행도 및 레벨 헤더 유지
   Widget _buildQuizHeader(int lvl) => Column(
     children: [
       Row(
@@ -312,6 +340,7 @@ class _QuizScreenState extends State<QuizScreen>
     ],
   );
 
+  // 문제 선택지 버튼 디자인 유지
   Widget _buildOptionButton(int index, String text) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
     child: SizedBox(
